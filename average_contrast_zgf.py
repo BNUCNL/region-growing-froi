@@ -3,6 +3,7 @@ import numpy as np
 import nibabel as nib
 import matplotlib.pyplot as plt
 
+
 DATA_NUM = 100
 FFA_LABEL = 3
 
