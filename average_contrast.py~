@@ -144,9 +144,7 @@ for i in range(4,5):
     y1 = contrast
     nib.save(t_img,output[i]+".nii.gz")
     print num
-    plt.plot(np.array(contrast)[:])
-    plt.xlabel('voxels')
-    plt.ylabel('average contrast')
+    plt.plot(np.array(contrast)[:],label='average contrast')
     plt.show()
 
 
