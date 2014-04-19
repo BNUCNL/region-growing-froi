@@ -11,6 +11,7 @@ LABEL_PATH = "/nfs/t2/atlas/database/"
 LABEL_POSTFIX = "/face-object/"
 SUBJECT_POSTFIX = "/obj.gfeat/cope1.feat/stats/tstat1.nii.gz"
 SUBJECT_LABELS = "face_z2.3.nii.gz"
+SUBJECT_NUMBER = [ ]
 
 output=['S0001(25,41,25)','S0004(25,36,29)','S0005(26,31,29)','S0006(23,38,23)','S0007(66,38,29)',\
         'S0009(25,39,24)','S0010(25,38,25)','S0012(25,41,26)','S0014(24,35,22)','S0016(22,35,24)',\
@@ -26,7 +27,6 @@ number=[116,64,21,13,166,239,172,48,148,783,54,27,94,917,138,135,25,187,\
 def load_data():
     subject_images = [ ]
     labels_images = [ ]
-    subject_names = [ ]
 
     index = 0
     while True:
@@ -37,9 +37,8 @@ def load_data():
             subject_num = "S" + '{:0>4}'.format(index)
             filepath = DATA_PATH + subject_num
             if os.path.exists(filepath):
+                SUBJECT_NUMBER.append(subject_num)
                 subject_images.append(nib.load(filepath + SUBJECT_POSTFIX).get_data())
-                print filepath + SUBJECT_POSTFIX
-
                 for item in os.listdir(LABEL_PATH + subject_num + LABEL_POSTFIX):
                     if "_ff" in item:
                         labels_images.append(nib.load(LABEL_PATH + subject_num + LABEL_POSTFIX + item).get_data())
@@ -66,6 +65,7 @@ def choose_seeds(subject_data, labels_images):
            seeds.append(np.unravel_index(temp.argmax(), subject_data[index, :, :, :].shape))
 
     result = np.array(seeds)
+    result.shape
     np.savetxt('seeds.txt', result, delimiter=',',  fmt='%.0f')
     print 'Valid label: ', valid_count
 
@@ -226,4 +226,5 @@ def average_contrast():
 
 if   __name__  ==  "__main__":
     subject_data, labels_images = load_data()
-    choose_seeds(subject_data, labels_images)
+    print choose_seeds(subject_data, labels_images)
+   
