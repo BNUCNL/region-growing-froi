@@ -1,0 +1,23 @@
+RGFROI is a versatile image processing software developed for neuroimaging
+data. Its goal is to provide diverse ways to extract ROI, especially in defining region
+of interest (ROI) for ROI analysis.
+
+* Website: <https://github.com/BNUCNL/region-growing-froi>
+
+# Installation
+
+Currently supports the following systems:
+
+* ubuntu/debian
+* centos/redhat/fedora
+* mac osx
+* windows
+
+* Python 2.7
+
+# License
+
+RGFROI is under Revised BSD License.
+See the [LICENSE file](https://github.com/BNUCNL/FreeROI/blob/master/LICENSE)
+for the full license text.
+
