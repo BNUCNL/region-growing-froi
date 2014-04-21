@@ -32,7 +32,7 @@ class neighbor:
         self.nbdim =  nbdim
         self.nbsize = nbsize
 
-    def offsets(self):
+    def compute_offsets(self):
         return self.compute_offsets()
 
 class pixelconn(neighbor):
@@ -95,7 +95,6 @@ class pixelconn(neighbor):
                                     [0, 1, 1],[1, 1, 1]])
         return offsets.T
 
-
 class sphere(neighbor):
     """Sphere neighbor for pixel or voxel.
     
@@ -148,8 +147,6 @@ class cube(neighbor):
         else: print 'wrong nbdim'
         return np.array(offsets).T
 
-                    
-                
 def get_bound(low, high, v, dist):
     """
     
@@ -219,78 +216,6 @@ def dist(v1, v2, res):
             (res[1] * (v1[1] - v2[1])) ** 2 +
             (res[2] * (v1[2] - v2[2])) ** 2) ** 0.5
 
-def yzt_sphere(data, voxels, res, radius):
-    """Deal with 3D data only.
-    
-    Parameters
-    ----------
-        data : array-like
-        voxels : list of 3-item tuples
-        radius : int or float
-    
-    Contributions
-    -------------
-        Author: 
-        Editor: 
-    """
-    
-    shape = data.shape
-    if len(shape) != 3:
-        raise ValueError('Data should be 3D')
-    result = np.zeros(shape)
-    resmin = min(res)
-    dmax = int(radius / resmin)
-    for idx, v in enumerate(voxels):
-        result[v[0], v[1], v[2]] = 1
-        xl, xh = get_bound(0, shape[0]-1, v[0], dmax)
-        yl, yh = get_bound(0, shape[1]-1, v[1], dmax)
-        zl, zh = get_bound(0, shape[2]-2, v[2], dmax)
-        for x in range(xl, xh+1):
-            for y in range(yl, yh+1):
-                for z in range(zl, zh+1):
-                    if (dist((x, y, z), v, res) <= radius and 
-                        data[x, y, z] != 0):
-                        result[x, y, z] = idx+1
-    return result
-
-def region_grow(data, voxels, res, radius, conn):
-    """Generate a region the same size as a sphere.
-    
-    Contributions
-    -------------
-        Author: 
-        Editor: 
-    """
-    shape = data.shape
-    if len(shape) != 3:
-        raise ValueError('Data should be 3D')
-    result = np.zeros(shape)
-    size = int((4.0 / 3 * pi * (radius ** 3)) / (res[0] * res[1] * res[2]))
-    try:
-        neighbor = ndimage.generate_binary_structure(3, conn_dict[conn])
-    except KeyError:
-        print 'Region grow connectivity must be 6, 18, or 26'
-        raise
-    pos = neighbor.nonzero()
-    neighbor = zip(pos[0], pos[1], pos[2])
-    neighbor.remove((1, 1, 1))
-    neighbor = np.array(neighbor) - (1, 1, 1)
-    for v in voxels:
-        newv = [v]
-        result[tuple(v)] = 1
-        region_size = 1
-        while region_size < size and newv != []:
-            new_size = 0
-            center = newv.pop(0)
-            neighbor_pos = neighbor + center
-            for pos in neighbor_pos:
-                if (result[tuple(pos)] == 1 or out_of_image(pos, shape) or data[tuple(pos)] == 0):
-                    continue
-                newv.append(pos)
-                result[tuple(pos)] = 1
-                new_size += 1
-            region_size += new_size
-    return result
 class neighbor_shape():
         def __init__(self,nbdim, nbsize, shape_type):
             self.nbdim = nbdim
@@ -394,23 +319,6 @@ class  volneighbors(pixelconn):
             count  = count + volnb_num
         neighbor_sparse_matrix = sparse.csc_matrix((is_nb,(volid,nbid)),shape = (vol_num,vol_num))
         return neighbor_sparse_matrix
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    pdb.set_trace()
-    mask = nib.load('prob-face-object.nii.gz')
-    mask = mask.get_data()
-    mask = np.nonzero(mask)
-    nei = volneighbors(mask)
-    matrix = nei.offsets_sparsematrix()
-
-
 
 class  ncut_volneighbors(pixelconn):
     

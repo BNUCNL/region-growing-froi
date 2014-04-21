@@ -193,7 +193,7 @@ def regiongrow3(image,epsilon,start_point):
         for j in range ( 0,shape[1] ):
             for k in range (0,shape[2]):
                 if not (i,j,k) in s:
-                    setVoxel(i,j,k,image,0)
+                    image[x,y,z] = 0
  
 
 
