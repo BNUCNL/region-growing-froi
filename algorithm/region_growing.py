@@ -2,11 +2,11 @@ import numpy as np
 import nibabel as nib
 
 class RegionGrowing:
-   """
-   Base class in region growing.
+    """
+    Base class in region growing.
 
-   """
-    def __init__(self, target_image, seed, connectivity,  stop_criteria, similarity_criteria='euclidean', mask_image=None, prior_image=None):
+    """
+    def __init__(self, target_image, seed, stop_criteria, connectivity='8', similarity_criteria='euclidean', mask_image=None, prior_image=None):
         """
          Parameters
         ----------
@@ -130,117 +130,70 @@ class SimilarityCriteria:
         """
         return self.similarity_direction
 
+class StopCriteria:
+    """
+    Stop criteria.
+    """
+    def __init__(self, name, mode, value):
+        """
+        Parameters
+        -----------------------------------------------------
+        name: 'size' or 'homogeneity',  means the size or the homogeneity of the region.
+        mode: 'fixed' or 'adaptive', means the threshold should be fixed value or adaptive.
+        value: fixed value, it should be none when mode is equal to 'adaptive'.
+        """
 
+        if not isinstance(name, str):
+            raise ValueError("The name must be str type. ")
+        elif name is not 'size' and name is not 'homogeneity':
+            raise ValueError("The name must be 'size' or 'homogeneity'.")
+        else:
+            self.set_name(name)
 
+        if not isinstance(mode, str):
+            raise ValueError("The mode must be str type. ")
+        elif mode is not 'fixed' and mode is not 'adaptive':
+            raise ValueError("The mode must be 'fixed' or 'adaptive'.")
+        else:
+            self.set_mode(mode)
 
-class ThreeOrTwoDRegionGrowing(RegionGrowing):
-    def __init__(self, input, seed, stop_criteria, output):
-        RegionGrowing.__init__(self)
-        self.set_seed(seed)
-        self.data = input
-        self.output = output
-        self.set_stop_criteria(stop_criteria)
+        if not isinstance(value, float) or not isinstance(value, int):
+            raise ValueError("The value must be float or int type.")
+        else:
+            self.set_value(value)
 
-    def set_stop_criteria(self, stop_criteria):
-        self.stop_criteria = stop_criteria
+    def set_name(self, name):
+        """
+        Set the name of the stop criteria.
+        """
+        self.name = name
 
-    def get_stop_criteria(self):
-        return self.stop_criteria
+    def get_name(self):
+        """
+        Get the name of the stop criteria.
+        """
+        return self.name
 
-    def getVoxel(self, x, y, z, data):                  #get the value of Voxel point
-        if x < 0 or x > data.shape[0]:
-            return False
+    def set_mode(self, mode):
+        """
+        Set the mode of the stop criteria.
+        """
+        self.mode = mode
 
-        if y < 0 or y > data.shape[1]:
-            return False
+    def get_mode(self):
+        """
+        Get the mode of the stop criteria.
+        """
+        return self.mode
 
-        if z < 0 or z > data.shape[2]:
-            return False
-
-        return data[x,y,z]
-
-    def setVoxel(x, y, z, data, value):           #set the value of Voxel point
-        if x < 0 or x > data.shape[0]:
-            return False
-
-        if y < 0 or y > data.shape[1]:
-            return False
-
-        if z < 0 or z > data.shape[2]:
-            return False
-
-        data[x, y, z] = value
-        return True
-
-    def growing(self):
-    #define function(original image\gradient difference\start point)radient
-
-        Q = Queue()                                      #Q is the queue of flag 1
-        s = []                                           #s is the list of flag 2
-        #flag=0
-
-        x = self.seed[0]
-        y = self.seed[1]
-        z = self.seed[2]
-
-        Q.enque((x,y,z))
-
-
-        while not Q.isEmpty():
-            #the circle when it is not empty
-            t = Q.deque()
-            x = t[0]
-            y = t[1]
-            z = t[2]
-            shape = self.data.shape
-
-            if x < shape[0] and abs(self.getVoxel(x+1, y, z, self.data) - self.getVoxel(x, y, z, self.data)) <= self.stop_criteria :
-
-                if not Q.isInside((x + 1, y, z)) and not (x + 1, y, z) in s:
-                #the point is not in the Q and s
-                    Q.enque((x + 1, y, z))
-                    #then insert the point
-
-
-            if x > 0 and abs(self.getVoxel(x - 1, y, z, self.data) - self.getVoxel(x, y, z,self.data)) <= self.stop_criteria:
-
-                if not Q.isInside((x - 1, y, z)) and not (x - 1, y, z) in s:
-                    Q.enque( (x - 1, y, z))
-
-
-            if y < shape[1] and abs(self.getVoxel(x, y+1, z, self.data) - self.getVoxel(x, y, z, self.data)) <= self.stop_criteria:
-
-                if not Q.isInside((x, y + 1, z) ) and not (x, y + 1, z) in s:
-                    Q.enque( (x, y + 1, z))
-
-
-            if y > 0 and abs(self.getVoxel(x, y - 1, z, self.data) - self.getVoxel(x, y, z, self.data)) <= self.stop_criteria:
-
-                if not Q.isInside((x, y - 1, z)) and not (x, y - 1, z) in s:
-                    Q.enque((x, y - 1, z))
-
-            if z < shape[2] and abs(self.getVoxel(x, y, z + 1, self.data) - self.getVoxel(x, y, z, self.data)) <= self.stop_criteria:
-
-                if not Q.isInside((x, y, z + 1)) and not (x, y, z + 1) in s:
-                    Q.enque( (x, y , z+1) )
-
-
-            if z > 0 and abs(self.getVoxel(x, y, z - 1, self.data) - self.getVoxel(x, y, z, self.data)) <= self.stop_criteria:
-
-                if not Q.isInside((x, y, z - 1)) and not (x, y, z - 1) in s:
-                    Q.enque((x, y, z - 1))
-
-
-            if t not in s:
-                s.append(t)             #affix the start point
-                #flag=flag+1
-
-
-        for i in range(0, shape[0]):
-            for j in range(0, shape[1]):
-                for k in range(0, shape[2]):
-                    if not (i, j, k) in s:
-                        self.data[x, y, z] = 0
+    def set_value(self, value):
+        """
+        Set the value of the stop criteria.
+        """
+        if self.get_mode() == 'adaptive':
+            self.value = None
+        else:
+            self.value = value
 
 
 
