@@ -6,20 +6,19 @@ class RegionGrowing:
    Base class in region growing.
 
    """
-    def __init__(self, input, seed, similarity_criteria, stop_criteria, output):
+    def __init__(self, target_image, seed, connectivity,  stop_criteria, similarity_criteria='euclidean', mask_image=None, prior_image=None):
         """
          Parameters
         ----------
         input: must be 2D/3D/4D np.ndarray type or a Nifti1 format file(*.nii, *.nii.gz).
         seed: the sedd points.
         stop_criteria: The stop criteria of region growing to stop.
-        output: must be 2D/3D/4D np.ndarray type or the path string of a Nifti1 format file(*.nii, *.nii.gz)
         """
-        if not isinstance(input, np.ndarray):
-            img = nib.load(input)
+        if not isinstance(target_image, np.ndarray):
+            img = nib.load(target_image)
             if len(img.shape) > 4 or len(img.shape) <2:
                 raise ValueError("Must be a 2D/3D/4D Nifti1 format file.")
-        elif len(input.shape) > 4 or len(input.shape) < 2:
+        elif len(target_image.shape) > 4 or len(target_image.shape) < 2:
             raise ValueError("Must be a 2D/3D/4D data.")
 
         if not isinstance(seed, list):
@@ -49,6 +48,18 @@ class RegionGrowing:
         """
         return self.get_similarity_criteria()
 
+    def set_connectivity(self):
+        """
+        Set the connectivity.
+        """
+        return self.set_connectivity()
+
+    def get_connectivity(self):
+        """
+        Get the connectivity.
+        """
+        return self.get_connectivity()
+
     def set_stop_criteria(self, stop_criteria):
         """
         Set the stop criteria.
@@ -65,7 +76,61 @@ class RegionGrowing:
         """
         The main region grow function.
         """
-        return self.growing()
+        return self.grow()
+
+
+class SimilarityCriteria:
+    """
+    Distance measure.
+    """
+
+    def __init__(self, X, name='euclidean', similarity_direction='seed'):
+        """
+        Parameters
+        -----------------------------------------------------
+        X: A matrix contain m n-dimensional row vectors.
+        name: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect.
+        similarity_direction: 'seed', 'neighbor', 'mutual'
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("The input X matrxi must be np.ndarray type. ")
+
+        if not isinstance(name, str):
+            raise ValueError("The value of name must be str type. ")
+        else:
+            self.set_name(name)
+        if not isinstance(similarity_direction, str):
+            raise ValueError("The value of similarity direction must be str type. ")
+        else:
+            self.set_similarity_direction(similarity_direction)
+
+    def set_name(self, name):
+        """
+        Set the name of the distances which to use.
+        """
+        self.name = name
+
+    def get_name(self):
+        """
+        Get the name of the distance used in the region growing.
+        """
+        return self.name
+
+    def set_similarity_direction(self, similarity_direction):
+        """
+        Set the similarity direction.
+        """
+        from scipy.spatial.distance import pdist
+
+        self.similarity_direction = pdist(self.X, similarity_direction)
+
+    def get_similarity_direction(self):
+        """
+        Get the similarity direction.
+        """
+        return self.similarity_direction
+
+
 
 
 class ThreeOrTwoDRegionGrowing(RegionGrowing):
