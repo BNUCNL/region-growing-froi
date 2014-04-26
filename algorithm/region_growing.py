@@ -1,6 +1,7 @@
 import numpy as np
 import nibabel as nib
 
+
 class RegionGrowing:
     """
     Base class in region growing.
@@ -194,11 +195,6 @@ class StopCriteria:
             self.value = None
         else:
             self.value = value
-
-
-
-
-
 
 
 

@@ -11,15 +11,14 @@ def region_growing_froi(seed,beta_image,var_image,model_type,nbsize):
     model: fe,re,me
     """
     if not isinstance(seed,np.ndarray):
-        seed = np.array(seed)
+        seed = np.array(seed)
+
 
     image_shape = beta_image.shape 
     if var_image.shape != image_shape:
-        print "The beta_image and var_image are not matched."
-        return false
-    elif not inside(seed,image_shape): 
-        print "The seed is out of the image"
-        return false
+        raise ValueError("The beta_image and var_image are not matched.")
+    elif not inside(seed,image_shape):
+        raise ValueError("The seed is out of the image")
         
     if not isinstance(seed,np.ndarray):
         seed = np.array(seed)
@@ -31,8 +30,7 @@ def region_growing_froi(seed,beta_image,var_image,model_type,nbsize):
     elif model_type == 'me':
         model = me
     else:
-        print("Model type for selectivity should be fe, re or me")
-        return false
+        raise ValueError("Model type for selectivity should be fe, re or me")
 
     # init the seed    
     sx,sy,sz = seed
