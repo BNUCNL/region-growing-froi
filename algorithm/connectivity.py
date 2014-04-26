@@ -55,6 +55,6 @@ def compute_offsets(nbdim,nbsize):
                                 [0, 0, 1],[1, 0, 1],[-1, 1, 1],
                                 [0, 1, 1],[1, 1, 1]])
         else: raise ValueError("4D data must be 26 neighbors.")
-    return offsets.T
+    return offsets
 
 
