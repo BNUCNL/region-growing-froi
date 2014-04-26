@@ -16,7 +16,7 @@ class RegionGrowing:
         """
         if not isinstance(target_image, nib.nifti1.Nifti1Image):
             if len(target_image.get_shape()) > 4 or len(target_image.get_shape()) <2:
-                raise ValueError("Must be a 2D/3D/4D or Nifti1Image format file.")
+                raise ValueError("Must be Nifti1Image format file.")
         elif len(target_image.shape) > 4 or len(target_image.shape) < 2:
             raise ValueError("Must be a 2D/3D/4D data.")
 
@@ -71,12 +71,19 @@ class RegionGrowing:
         """
         return self.get_stop_criteria()
 
+    def inside(coordinate,image_shape):
+        """
+        whether the coordinate is in the image,return True or False.
+        """
+        return  (coordinate[0] >= 0) and (coordinate[0] < image_shape[0]) and \
+                (coordinate[1] >= 0) and (coordinate[1] < image_shape[1]) and \
+                (coordinate[2] >= 0) and (coordinate[2] < image_shape[2])
+
     def grow(self):
         """
         The main region grow function.
         """
         return self.grow()
-
 
 class SimilarityCriteria:
     """
@@ -212,6 +219,7 @@ class FixedThresholdSRG(RegionGrowing):
         seed: the seed points.
         value the stop threshold.
         """
+        RegionGrowing.__init__(self)
         if not isinstance(target_image, nib.nifti1.Nifti1Image):
             if len(target_image.get_shape()) > 3 or len(target_image.get_shape()) <2:
                 raise ValueError("Must be a 2D/3D or Nifti1Image format file.")
@@ -221,8 +229,15 @@ class FixedThresholdSRG(RegionGrowing):
             raise ValueError("Must be a 2D/3D data.")
 
         self.target_image = target_image
-        self.seed = seed
+        self.set_seed(seed)
         self.set_stop_criteria(value)
+
+    def set_seed(self, seed):
+        self.seed = seed
+
+    def get_seed(self):
+        return self.seed
+
 
     def set_stop_criteria(self, stop_criteria):
         """
@@ -349,6 +364,11 @@ class FixedThresholdSRG(RegionGrowing):
             self.output[array[:][0], array[:][1], array[:][2]] = 1
 
             return self.output
+
+
+# main:
+# a = FixedThresholdSRG(x,y,z)
+# ret = a.grow()
 
 
 
