@@ -11,13 +11,12 @@ class RegionGrowing:
          Parameters
         ----------
         input: must be 2D/3D/4D np.ndarray type or a Nifti1 format file(*.nii, *.nii.gz).
-        seed: the sedd points.
+        seed: the seed points.
         stop_criteria: The stop criteria of region growing to stop.
         """
-        if not isinstance(target_image, np.ndarray):
-            img = nib.load(target_image)
-            if len(img.shape) > 4 or len(img.shape) <2:
-                raise ValueError("Must be a 2D/3D/4D Nifti1 format file.")
+        if not isinstance(target_image, nib.nifti1.Nifti1Image):
+            if len(target_image.get_shape()) > 4 or len(target_image.get_shape()) <2:
+                raise ValueError("Must be a 2D/3D/4D or Nifti1Image format file.")
         elif len(target_image.shape) > 4 or len(target_image.shape) < 2:
             raise ValueError("Must be a 2D/3D/4D data.")
 
@@ -70,7 +69,7 @@ class RegionGrowing:
         """
         Return the stop criteria.
         """
-        return self.stop_criteria
+        return self.get_stop_criteria()
 
     def grow(self):
         """
@@ -194,6 +193,168 @@ class StopCriteria:
             self.value = None
         else:
             self.value = value
+
+    def get_value(self, value):
+        """
+        Get the value of the stop criteria.
+        """
+        return self.value
+
+class FixedThresholdSRG(RegionGrowing):
+    """
+    Region growing with a fixed threshold.
+    """
+    def __init__(self, target_image, seed, value):
+        """
+        Parameters
+        -----------------------------------------------------
+        target_image: input image, a 2D/3D Nifti1Image format file
+        seed: the seed points.
+        value the stop threshold.
+        """
+        if not isinstance(target_image, nib.nifti1.Nifti1Image):
+            if len(target_image.get_shape()) > 3 or len(target_image.get_shape()) <2:
+                raise ValueError("Must be a 2D/3D or Nifti1Image format file.")
+            else:
+                target_image = target_image.get_data()
+        elif len(target_image.shape) > 3 or len(target_image.shape) < 2:
+            raise ValueError("Must be a 2D/3D data.")
+
+        self.target_image = target_image
+        self.seed = seed
+        self.set_stop_criteria(value)
+
+    def set_stop_criteria(self, stop_criteria):
+        """
+        Set the stop criteria.
+        """
+        self.stop_criteria = StopCriteria('size', 'fixed', stop_criteria)
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def grow(self):
+        """
+        Fixed threshold region growing.
+        """
+        Q = []
+        #list of new picture point
+        s = []
+
+        if len(self.target_image.shape) == 2:
+            #(x,y) start point
+            x, y = self.seed
+
+            #the function to transfer image to grey-scale map
+            image = self.target_image.convert("L")
+            Q.insert((x, y))
+
+            while len(Q) != 0:
+                t = Q.pop()
+                x = t[0]
+                y = t[1]
+
+                #in the size of picture and the gradient difference is not so large
+
+                if x < image.size[0] - 1 and \
+                        abs(image.getpixel((x + 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+
+                    if not (x + 1, y) in Q and not (x + 1, y) in s:
+                        Q.insert((x + 1, y))
+
+
+                if x > 0 and \
+                        abs(image.getpixel((x - 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+
+                    if not (x - 1, y) in Q and not (x - 1, y) in s:
+                        Q.insert((x - 1, y))
+
+
+                if y < (image.size[1] - 1) and \
+                        abs(image.getpixel((x, y + 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+
+                    if not (x, y + 1) in Q and not (x, y + 1) in s:
+                        Q.insert((x, y + 1))
+
+
+                if y > 0 and \
+                        abs( image.getpixel((x, y - 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+                    if not (x, y - 1) in Q and not (x, y - 1) in s:
+                        Q.insert((x, y - 1))
+
+                if t not in s:
+                    s.append(t)
+
+            image.load()
+            putpixel = image.im.putpixel
+
+            for i in range(image.size[0]):
+                for j in range(image.size[1]):
+                    putpixel( (i, j), 0)
+
+            for i in s:
+                putpixel(i, 150)
+            return image
+        elif len(self.target_image.shape) == 3:
+            #define function(original image\gradient difference\start point)radient
+            Q = []
+            s = []
+
+            x, y, z = self.seed
+            Q.insert((x, y, z))
+
+            while len(Q) != 0:
+                t = Q.pop()
+                x = t[0]
+                y = t[1]
+                z = t[2]
+
+                if x < self.target_image.shape[0] and \
+                        abs(self.target_image[x + 1, y, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                    if not (x + 1, y, z)in Q and not (x + 1, y, z) in s:
+                        Q.insert((x + 1, y, z))
+
+                if x > 0 and abs(self.target_image[x - 1, y, z] -
+                    self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                    if not (x - 1, y, z) in Q and not (x - 1, y, z) in s:
+                        Q.insert((x - 1, y, z))
+
+                if y < self.target_image.shape[1] and \
+                        abs(self.target_image[x, y + 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                    if not (x, y + 1,z) in Q and not (x, y + 1, z) in s:
+                        Q.insert((x, y + 1, z))
+
+                if y > 0 and \
+                        abs(self.target_image[x, y - 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                    if not (x, y - 1 ,z) in Q and not (x, y - 1, z) in s:
+                        Q.insert((x, y - 1, z))
+
+                if z < self.target_image.shape[2] and \
+                        abs(self.target_image[x, y, z + 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                    if not (x, y, z + 1) in Q and not (x, y, z + 1) in s:
+                        Q.insert((x, y, z + 1))
+
+                if z > 0 and \
+                        abs(self.target_image[x, y, z - 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                    if not (x, y, z - 1) in Q and not (x, y, z - 1) in s:
+                        Q.insert((x, y, z - 1))
+                if t not in s:
+                    s.append(t)
+
+            array = np.array(s).transpose()
+            self.output = self.target_image.copy()
+            self.output[array[:][0], array[:][1], array[:][2]] = 1
+
+            return self.output
+
+
+
+
+
+
 
 
 
