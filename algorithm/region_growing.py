@@ -30,13 +30,13 @@ class RegionGrowing:
         """
         Set the seed points.
         """
-        self.set_seed()
+        self.seed = seed
 
     def get_seed(self):
         """
         Return the seed points.
         """
-        return self.get_seed()
+        return self.seed
 
     def set_similarity_criteria(self, similarity_criteria):
         """
@@ -74,11 +74,46 @@ class RegionGrowing:
         """
         return self.get_stop_criteria()
 
-    def grow(self):
+    def grow(self, image, seed, Num):
         """
-        The main region grow function.
+        Give a coordinate ,return a region.
         """
-        return self.grow()
+        x,y,z = seed
+        image_shape = image.shape
+
+        if inside(seed,image_shape)!=True:
+            print "The seed is out of the image range."
+            return False
+
+        region_size = 1
+        origin_t = image[x,y,z]
+        tmp_image = np.zeros_like(image)
+        self.inner_image = np.zeros_like(image)
+
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free,4))
+
+        while region_size <= Num:
+            for i in range(26):
+                set0,set1,set2 = compute_offsets(3,26)[i]
+                xn,yn,zn = x+set0,y+set1,z+set2
+                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
+                    neighbor_pos = neighbor_pos+1
+                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
+                    tmp_image[xn,yn,zn] = 1
+
+            tmp_image[x,y,z] = 2
+            self.inner_image[x,y,z] = image[x,y,z]
+            region_size += 1
+
+            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
+            index = distance.argmin()
+            x,y,z = neighbor_list[index][:3]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+
+        return self.inner_image
 
 class SimilarityCriteria:
     """
@@ -360,6 +395,35 @@ class FixedThresholdSRG(RegionGrowing):
 
             return self.output
 
+class fixed_region_grow(RegionGrowing):
+    """
+    Fixed threshold region growing.
+    """
+    def __init__(self, target_image, seed, Thres):
+        if not isinstance(seed,np.ndarray):
+            seed = np.array(seed)
+        self.target_image = target_image
+        self.set_seed(seed)
+        self.set_stop_criteria(Thres)
+
+    def set_stop_criteria(self, stop_criteria):
+        """
+        Set the stop criteria.
+        """
+        self.stop_criteria = stop_criteria
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def _grow(self, image, seed, Num):
+        """
+        Average contrast growing.
+        """
+        #N = self.get_stop_criteria().value
+        return self.grow(image, seed, Num)
 
 class Average_contrast(RegionGrowing):
     """
@@ -371,18 +435,6 @@ class Average_contrast(RegionGrowing):
         self.target_image = target_image
         self.set_seed(seed)
         self.set_stop_criteria(target_image, seed, Thres)
-
-    def set_seed(self, seed):
-        """
-        Set the seed points.
-        """
-        self.seed = seed
-
-    def get_seed(self):
-        """
-        Return the seed points.
-        """
-        return self.seed
 
     def set_stop_criteria(self, image, seed, Num):
         """
@@ -441,49 +493,14 @@ class Average_contrast(RegionGrowing):
         """
         return self.stop_criteria
 
-    def grow(self, image, seed, Num):
+    def _grow(self, image, seed, Num):
         """
-        Give a coordinate ,return a region.
+        Average contrast growing.
         """
-        x,y,z = seed
-        image_shape = image.shape
-
-        if inside(seed,image_shape)!=True:
-            print "The seed is out of the image range."
-            return False
-
-        region_size = 1
-        origin_t = image[x,y,z]
-
         self.set_stop_criteria(image, seed, Num)
         N = self.get_stop_criteria().value
-        tmp_image = np.zeros_like(image)
-        inner_image = np.zeros_like(image)
+        return self.grow(image, seed, N)
 
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free,4))
-
-        while region_size <= N:
-            for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
-                xn,yn,zn = x+set0,y+set1,z+set2
-                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
-                    neighbor_pos = neighbor_pos+1
-                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
-                    tmp_image[xn,yn,zn] = 1
-
-            tmp_image[x,y,z] = 2
-            inner_image[x,y,z] = image[x,y,z]
-            region_size += 1
-
-            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
-            index = distance.argmin()
-            x,y,z = neighbor_list[index][:3]
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
-
-        return inner_image
 
 class Peripheral_contrast(RegionGrowing):
     """
@@ -495,18 +512,6 @@ class Peripheral_contrast(RegionGrowing):
         self.target_image = target_image
         self.set_seed(seed)
         self.set_stop_criteria(target_image, seed, Thres)
-
-    def set_seed(self, seed):
-        """
-        Set the seed points.
-        """
-        self.seed = seed
-
-    def get_seed(self):
-        """
-        Return the seed points.
-        """
-        return self.seed
 
     def is_neiflag(self,flag_image,coordinate,flag):
         """
@@ -604,64 +609,33 @@ class Peripheral_contrast(RegionGrowing):
         """
         return self.stop_criteria
 
-    def grow(self, image, seed, Num):
+    def _grow(self, image, seed, Num):
         """
-        Give a coordinate ,return a region.
+        Peripheral contrast growing.
         """
-        x,y,z = seed
-        image_shape = image.shape
-
-        if inside(seed,image_shape)!=True:
-            print "The seed is out of the image range."
-            return False
-
-        region_size = 1
-        origin_t = image[x,y,z]
-
         self.set_stop_criteria(image, seed, Num)
         N = self.get_stop_criteria().value
-        tmp_image = np.zeros_like(image)
-        inner_image = np.zeros_like(image)
-
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free,4))
-
-        while region_size <= N:
-            for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
-                xn,yn,zn = x+set0,y+set1,z+set2
-                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
-                    neighbor_pos = neighbor_pos+1
-                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
-                    tmp_image[xn,yn,zn] = 1
-
-            tmp_image[x,y,z] = 2
-            inner_image[x,y,z] = image[x,y,z]
-            region_size += 1
-
-            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
-            index = distance.argmin()
-            x,y,z = neighbor_list[index][:3]
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
-
-        return inner_image
+        return self.grow(image, seed, N)
 
 
 if __name__ == "__main__":
     t_image = nib.load('../data/S2/tstat1.nii.gz')
     data = t_image.get_data()
     A = Average_contrast(data, (26,38,25), 1000)
-    new_image = A.grow(data, (26,38,25), 1000)
+    new_image = A._grow(data, (26,38,25), 1000)
     t_image._data = new_image
     nib.save(t_image,'ACB_S2_image.nii.gz')
     print 'average contrast growing has been saved.'
     #B = Peripheral_contrast(data, (26,38,25), 1000)
-    #new_image = B.grow(data, (26,38,25), 1000)
+    #new_image = B._grow(data, (26,38,25), 1000)
     #t_image._data = new_image
     #nib.save(t_image,'PCB_S2_image')
     #print 'peripheral contrast growing has been saved.'
+    C = fixed_region_grow(data,(26,38,25),200)
+    new_image = C._grow(data,(26,38,25),200)
+    t_image._data = new_image
+    nib.save(t_image,'fixed_thres_S2_image.nii.gz')
+    print 'fixed threshold growing has been saved.'
 
 
 
