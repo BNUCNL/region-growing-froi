@@ -1,5 +1,8 @@
 import numpy as np
 import nibabel as nib
+from connectivity import compute_offsets
+from whetherinside import inside
+
 
 class RegionGrowing:
     """
@@ -20,20 +23,20 @@ class RegionGrowing:
         elif len(target_image.shape) > 4 or len(target_image.shape) < 2:
             raise ValueError("Must be a 2D/3D/4D data.")
 
-        if not isinstance(seed, list):
-            seed = [seed]
+        if not isinstance(seed,np.ndarray):
+            seed = np.array(seed)
 
     def set_seed(self, seed):
         """
         Set the seed points.
         """
-        self.set_seed()
+        self.seed = seed
 
     def get_seed(self):
         """
         Return the seed points.
         """
-        return self.get_seed()
+        return self.seed
 
     def set_similarity_criteria(self, similarity_criteria):
         """
@@ -71,19 +74,46 @@ class RegionGrowing:
         """
         return self.get_stop_criteria()
 
-    def inside(coordinate,image_shape):
+    def grow(self, image, seed, Num):
         """
-        whether the coordinate is in the image,return True or False.
+        Give a coordinate ,return a region.
         """
-        return  (coordinate[0] >= 0) and (coordinate[0] < image_shape[0]) and \
-                (coordinate[1] >= 0) and (coordinate[1] < image_shape[1]) and \
-                (coordinate[2] >= 0) and (coordinate[2] < image_shape[2])
+        x,y,z = seed
+        image_shape = image.shape
 
-    def grow(self):
-        """
-        The main region grow function.
-        """
-        return self.grow()
+        if inside(seed,image_shape)!=True:
+            print "The seed is out of the image range."
+            return False
+
+        region_size = 1
+        origin_t = image[x,y,z]
+        tmp_image = np.zeros_like(image)
+        self.inner_image = np.zeros_like(image)
+
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free,4))
+
+        while region_size <= Num:
+            for i in range(26):
+                set0,set1,set2 = compute_offsets(3,26)[i]
+                xn,yn,zn = x+set0,y+set1,z+set2
+                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
+                    neighbor_pos = neighbor_pos+1
+                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
+                    tmp_image[xn,yn,zn] = 1
+
+            tmp_image[x,y,z] = 2
+            self.inner_image[x,y,z] = image[x,y,z]
+            region_size += 1
+
+            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
+            index = distance.argmin()
+            x,y,z = neighbor_list[index][:3]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+
+        return self.inner_image
 
 class SimilarityCriteria:
     """
@@ -163,7 +193,7 @@ class StopCriteria:
         else:
             self.set_mode(mode)
 
-        if not isinstance(value, float) or not isinstance(value, int):
+        if not isinstance(value, float) and not isinstance(value, int):
             raise ValueError("The value must be float or int type.")
         else:
             self.set_value(value)
@@ -377,14 +407,247 @@ class FixedThresholdSRG(RegionGrowing):
 
                 return self.output
 
+class fixed_region_grow(RegionGrowing):
+    """
+    Fixed threshold region growing.
+    """
+    def __init__(self, target_image, seed, Thres):
+        if not isinstance(seed,np.ndarray):
+            seed = np.array(seed)
+        self.target_image = target_image
+        self.set_seed(seed)
+        self.set_stop_criteria(Thres)
 
-# main:
-# a = FixedThresholdSRG(x,y,z)
-# ret = a.grow()
+    def set_stop_criteria(self, stop_criteria):
+        """
+        Set the stop criteria.
+        """
+        self.stop_criteria = stop_criteria
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def _grow(self, image, seed, Num):
+        """
+        Average contrast growing.
+        """
+        #N = self.get_stop_criteria().value
+        return self.grow(image, seed, Num)
+
+class Average_contrast(RegionGrowing):
+    """
+    Max average contrast region growing.
+    """
+    def __init__(self, target_image, seed, Thres):
+        if not isinstance(seed,np.ndarray):
+            seed = np.array(seed)
+        self.target_image = target_image
+        self.set_seed(seed)
+        self.set_stop_criteria(target_image, seed, Thres)
+
+    def set_stop_criteria(self, image, seed, Num):
+        """
+        set stop criteria according to the max average contrast point.
+        """
+        x,y,z = seed
+        image_shape = image.shape
+        if inside(seed,image_shape)!=True:
+            print "The seed is out of the image range."
+            return False
+
+        contrast = []
+        region_size = 1
+        origin_t = image[x,y,z]
+        inner_list = [origin_t]
+        tmp_image = np.zeros_like(image)
+
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free,4))
+
+        while region_size <= Num:
+            for i in range(26):
+                set0,set1,set2 = compute_offsets(3,26)[i]
+                xn,yn,zn = x+set0,y+set1,z+set2
+                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
+                    neighbor_pos = neighbor_pos+1
+                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
+                    tmp_image[xn,yn,zn] = 1
+
+            out_boundary = neighbor_list[np.nonzero(neighbor_list[:,3]),3]
+            contrast = contrast + [np.mean(np.array(inner_list)) - np.mean(out_boundary)]
+
+            tmp_image[x,y,z] = 2
+            region_size += 1
+
+            if (neighbor_pos+100 > neighbor_free):
+                neighbor_free +=10000
+                new_list = np.zeros((10000,4))
+                neighbor_list = np.vstack((neighbor_list,new_list))
+                #if the longth of neighbor_list is not enough,add another 10000
+
+            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
+            index = distance.argmin()
+            x,y,z = neighbor_list[index][:3]
+            inner_list = inner_list + [image[x,y,z]]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+        number = int(np.array(contrast).argmax()+1)
+        print number
+        self.stop_criteria = StopCriteria('size','fixed',number)
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def _grow(self, image, seed, Num):
+        """
+        Average contrast growing.
+        """
+        self.set_stop_criteria(image, seed, Num)
+        N = self.get_stop_criteria().value
+        return self.grow(image, seed, N)
 
 
+class Peripheral_contrast(RegionGrowing):
+    """
+    Max peripheral contrast region growing.
+    """
+    def __init__(self, target_image, seed, Thres):
+        if not isinstance(seed,np.ndarray):
+            seed = np.array(seed)
+        self.target_image = target_image
+        self.set_seed(seed)
+        self.set_stop_criteria(target_image, seed, Thres)
+
+    def is_neiflag(self,flag_image,coordinate,flag):
+        """
+        if coordinate has a neighbor with certain flag return True,else False.
+        """
+        x,y,z = coordinate
+        for j in range(26):
+            set0,set1,set2 = compute_offsets(3,26)[j]
+            xn,yn,zn = x+set0,y+set1,z+set2
+            if flag_image[xn,yn,zn]==flag:
+                return True
+        return False
+
+    def inner_boundary(self,flag_image,inner_region_cor):
+        """
+        find the inner boundary of the region.
+        """
+        inner_b = []
+        for i in inner_region_cor:
+            if self.is_neiflag(flag_image,i,1):
+                if inner_b == [ ]:
+                    inner_b = i
+                else:
+                    inner_b= np.vstack((inner_b,i))
+        return np.array(inner_b)
 
 
+    def set_stop_criteria(self, image, seed, Num):
+        """
+        set stop criteria according to the max average contrast point.
+        """
+        x,y,z = seed
+        image_shape = image.shape
+        if inside(seed,image_shape)!=True:
+            print "The seed is out of the image range."
+            return False
+
+        contrast = []
+        region_size = 1
+        origin_t = image[x,y,z]
+        tmp_image = np.zeros_like(image)
+
+        default_space = 10000
+        outer_pos = -1
+        inner_pos = -1
+        inner_list = np.zeros((default_space,4))
+        outer_boundary_list = np.zeros((default_space,4))
+
+        while region_size <= Num:
+            inner_pos = inner_pos + 1
+            inner_list[inner_pos] = [x,y,z,image[x,y,z]]
+            for i in range(26):
+                set0,set1,set2 = compute_offsets(3,26)[i]
+                xn,yn,zn = x+set0,y+set1,z+set2
+                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
+                    outer_pos = outer_pos+1
+                    outer_boundary_list[outer_pos] = [xn,yn,zn,image[xn,yn,zn]]
+                    tmp_image[xn,yn,zn] = 1
+
+            outer_boundary = outer_boundary_list[np.nonzero(outer_boundary_list[:,3]),3]
+            inner_region_cor = inner_list[np.nonzero(inner_list[:,3]),:3][0]
+            inner_boundary_cor = self.inner_boundary(tmp_image,np.array(inner_region_cor))
+
+            inner_boundary_val = []
+            if len(inner_boundary_cor.shape) == 1:
+                inner_boundary_val = inner_boundary_val + [image[inner_boundary_cor[0], \
+                                     inner_boundary_cor[1],inner_boundary_cor[2]]]
+            else:
+                for i in inner_boundary_cor:
+                    inner_boundary_val = inner_boundary_val + [image[i[0],i[1],i[2]]]
+
+            contrast = contrast + [np.mean(inner_boundary_val) - np.mean(outer_boundary)]
+            tmp_image[x,y,z] = 2
+            region_size += 1
+
+            if (outer_pos+100 > default_space):
+                default_space +=10000
+                new_list = np.zeros((10000,4))
+                outer_boundary_list = np.vstack((outer_boundary_list,new_list))
+
+            distance = np.abs(outer_boundary_list[:outer_pos+1,3] - np.tile(origin_t,outer_pos+1))
+            index = distance.argmin()
+            x,y,z = outer_boundary_list[index][:3]
+
+            outer_boundary_list[index] = outer_boundary_list[outer_pos]
+            outer_pos -= 1
+
+        number = int(np.array(contrast).argmax()+1)
+        print number
+        self.stop_criteria = StopCriteria('size','fixed',number)
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def _grow(self, image, seed, Num):
+        """
+        Peripheral contrast growing.
+        """
+        self.set_stop_criteria(image, seed, Num)
+        N = self.get_stop_criteria().value
+        return self.grow(image, seed, N)
+
+
+if __name__ == "__main__":
+    t_image = nib.load('../data/S2/tstat1.nii.gz')
+    data = t_image.get_data()
+    A = Average_contrast(data, (26,38,25), 1000)
+    new_image = A._grow(data, (26,38,25), 1000)
+    t_image._data = new_image
+    nib.save(t_image,'ACB_S2_image.nii.gz')
+    print 'average contrast growing has been saved.'
+    #B = Peripheral_contrast(data, (26,38,25), 1000)
+    #new_image = B._grow(data, (26,38,25), 1000)
+    #t_image._data = new_image
+    #nib.save(t_image,'PCB_S2_image')
+    #print 'peripheral contrast growing has been saved.'
+    C = fixed_region_grow(data,(26,38,25),200)
+    new_image = C._grow(data,(26,38,25),200)
+    t_image._data = new_image
+    nib.save(t_image,'fixed_thres_S2_image.nii.gz')
+    print 'fixed threshold growing has been saved.'
 
 
 

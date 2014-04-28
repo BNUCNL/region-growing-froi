@@ -136,7 +136,7 @@ def region_growing(image,seed,N,output):
    
     return inner_image,region_size-1,contrast
 
-for i in range(4,5):
+for i in range(0,5):
     t_img=nib.load(image_index[i])
     t_data=t_img.get_data() 
     region,num,contrast = region_growing(t_data,seeds[i],N,output[i])
