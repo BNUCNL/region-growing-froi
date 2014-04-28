@@ -47,7 +47,7 @@ class RegionGrowing:
         """
         return self.get_similarity_criteria()
 
-    def set_connectivity(self):
+    def set_connectivity(self, connectivity):
         """
         Set the connectivity.
         """
@@ -211,7 +211,7 @@ class FixedThresholdSRG(RegionGrowing):
     """
     Region growing with a fixed threshold.
     """
-    def __init__(self, target_image, seed, value):
+    def __init__(self, target_image, seed, value, connectivity='6'):
         """
         Parameters
         -----------------------------------------------------
@@ -231,6 +231,7 @@ class FixedThresholdSRG(RegionGrowing):
         self.target_image = target_image
         self.set_seed(seed)
         self.set_stop_criteria(value)
+        self.set_connectivity(connectivity)
 
     def set_seed(self, seed):
         self.seed = seed
@@ -250,6 +251,18 @@ class FixedThresholdSRG(RegionGrowing):
         Return the stop criteria.
         """
         return self.stop_criteria
+
+    def set_connectivity(self, connectivity='6'):
+        """
+        Set the connectivity.
+        """
+        self.connectivity = connectivity
+
+    def get_connectivity(self):
+        """
+        Get the connectivity.
+        """
+        return self.get_connectivity()
 
     def grow(self):
         """
@@ -271,48 +284,46 @@ class FixedThresholdSRG(RegionGrowing):
                 t = Q.pop()
                 x = t[0]
                 y = t[1]
+                if self.get_connectivity() == '6':
+                    #in the size of picture and the gradient difference is not so large
 
-                #in the size of picture and the gradient difference is not so large
+                    if x < image.size[0] - 1 and \
+                            abs(image.getpixel((x + 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
 
-                if x < image.size[0] - 1 and \
-                        abs(image.getpixel((x + 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
-
-                    if not (x + 1, y) in Q and not (x + 1, y) in s:
-                        Q.insert((x + 1, y))
-
-
-                if x > 0 and \
-                        abs(image.getpixel((x - 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
-
-                    if not (x - 1, y) in Q and not (x - 1, y) in s:
-                        Q.insert((x - 1, y))
+                        if not (x + 1, y) in Q and not (x + 1, y) in s:
+                            Q.insert((x + 1, y))
 
 
-                if y < (image.size[1] - 1) and \
-                        abs(image.getpixel((x, y + 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+                    if x > 0 and \
+                            abs(image.getpixel((x - 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
 
-                    if not (x, y + 1) in Q and not (x, y + 1) in s:
-                        Q.insert((x, y + 1))
+                        if not (x - 1, y) in Q and not (x - 1, y) in s:
+                            Q.insert((x - 1, y))
 
+                    if y < (image.size[1] - 1) and \
+                            abs(image.getpixel((x, y + 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
 
-                if y > 0 and \
-                        abs( image.getpixel((x, y - 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
-                    if not (x, y - 1) in Q and not (x, y - 1) in s:
-                        Q.insert((x, y - 1))
+                        if not (x, y + 1) in Q and not (x, y + 1) in s:
+                            Q.insert((x, y + 1))
 
-                if t not in s:
-                    s.append(t)
+                    if y > 0 and \
+                            abs( image.getpixel((x, y - 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+                        if not (x, y - 1) in Q and not (x, y - 1) in s:
+                            Q.insert((x, y - 1))
 
-            image.load()
-            putpixel = image.im.putpixel
+                    if t not in s:
+                        s.append(t)
 
-            for i in range(image.size[0]):
-                for j in range(image.size[1]):
-                    putpixel( (i, j), 0)
+                image.load()
+                putpixel = image.im.putpixel
 
-            for i in s:
-                putpixel(i, 150)
-            return image
+                for i in range(image.size[0]):
+                    for j in range(image.size[1]):
+                        putpixel( (i, j), 0)
+
+                for i in s:
+                    putpixel(i, 150)
+                return image
         elif len(self.target_image.shape) == 3:
             #define function(original image\gradient difference\start point)radient
             Q = []
@@ -327,43 +338,44 @@ class FixedThresholdSRG(RegionGrowing):
                 y = t[1]
                 z = t[2]
 
-                if x < self.target_image.shape[0] and \
-                        abs(self.target_image[x + 1, y, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                    if not (x + 1, y, z)in Q and not (x + 1, y, z) in s:
-                        Q.insert((x + 1, y, z))
+                if self.get_connectivity() == '6':
+                    if x < self.target_image.shape[0] and \
+                            abs(self.target_image[x + 1, y, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                        if not (x + 1, y, z)in Q and not (x + 1, y, z) in s:
+                            Q.insert((x + 1, y, z))
 
-                if x > 0 and abs(self.target_image[x - 1, y, z] -
-                    self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                    if not (x - 1, y, z) in Q and not (x - 1, y, z) in s:
-                        Q.insert((x - 1, y, z))
+                    if x > 0 and abs(self.target_image[x - 1, y, z] -
+                        self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                        if not (x - 1, y, z) in Q and not (x - 1, y, z) in s:
+                            Q.insert((x - 1, y, z))
 
-                if y < self.target_image.shape[1] and \
-                        abs(self.target_image[x, y + 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                    if not (x, y + 1,z) in Q and not (x, y + 1, z) in s:
-                        Q.insert((x, y + 1, z))
+                    if y < self.target_image.shape[1] and \
+                            abs(self.target_image[x, y + 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                        if not (x, y + 1,z) in Q and not (x, y + 1, z) in s:
+                            Q.insert((x, y + 1, z))
 
-                if y > 0 and \
-                        abs(self.target_image[x, y - 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                    if not (x, y - 1 ,z) in Q and not (x, y - 1, z) in s:
-                        Q.insert((x, y - 1, z))
+                    if y > 0 and \
+                            abs(self.target_image[x, y - 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                        if not (x, y - 1 ,z) in Q and not (x, y - 1, z) in s:
+                            Q.insert((x, y - 1, z))
 
-                if z < self.target_image.shape[2] and \
-                        abs(self.target_image[x, y, z + 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                    if not (x, y, z + 1) in Q and not (x, y, z + 1) in s:
-                        Q.insert((x, y, z + 1))
+                    if z < self.target_image.shape[2] and \
+                            abs(self.target_image[x, y, z + 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                        if not (x, y, z + 1) in Q and not (x, y, z + 1) in s:
+                            Q.insert((x, y, z + 1))
 
-                if z > 0 and \
-                        abs(self.target_image[x, y, z - 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                    if not (x, y, z - 1) in Q and not (x, y, z - 1) in s:
-                        Q.insert((x, y, z - 1))
-                if t not in s:
-                    s.append(t)
+                    if z > 0 and \
+                            abs(self.target_image[x, y, z - 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
+                        if not (x, y, z - 1) in Q and not (x, y, z - 1) in s:
+                            Q.insert((x, y, z - 1))
+                    if t not in s:
+                        s.append(t)
 
-            array = np.array(s).transpose()
-            self.output = self.target_image.copy()
-            self.output[array[:][0], array[:][1], array[:][2]] = 1
+                array = np.array(s).transpose()
+                self.output = self.target_image.copy()
+                self.output[array[:][0], array[:][1], array[:][2]] = 1
 
-            return self.output
+                return self.output
 
 
 # main:
