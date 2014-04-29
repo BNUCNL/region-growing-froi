@@ -9,7 +9,7 @@ class RegionGrowing:
     Base class in region growing.
 
     """
-    def __init__(self, target_image, seed, stop_criteria, connectivity='8', similarity_criteria='euclidean', mask_image=None, prior_image=None):
+    def __init__(self, target_image, seed, stop_criteria, connectivity='8', similarity_criteria='euclidean', mask_image=None):
         """
          Parameters
         ----------
@@ -18,13 +18,13 @@ class RegionGrowing:
         stop_criteria: The stop criteria of region growing to stop.
         """
         if not isinstance(target_image, nib.nifti1.Nifti1Image):
-            if len(target_image.get_shape()) > 4 or len(target_image.get_shape()) <2:
+            if len(target_image.get_shape()) > 4 or len(target_image.get_shape()) < 2:
                 raise ValueError("Must be Nifti1Image format file.")
         elif len(target_image.shape) > 4 or len(target_image.shape) < 2:
             raise ValueError("Must be a 2D/3D/4D data.")
 
-        if not isinstance(seed,np.ndarray):
-            seed = np.array(seed)
+        if not isinstance(seed, np.ndarray):
+            self.seed = np.array(seed)
 
     def set_seed(self, seed):
         """
@@ -54,7 +54,7 @@ class RegionGrowing:
         """
         Set the connectivity.
         """
-        return self.set_connectivity()
+        return self.set_connectivity(connectivity)
 
     def get_connectivity(self):
         """
@@ -74,71 +74,93 @@ class RegionGrowing:
         """
         return self.get_stop_criteria()
 
-    def grow(self, image, seed, Num):
+    def grow(self):
         """
         Give a coordinate ,return a region.
         """
-        x,y,z = seed
-        image_shape = image.shape
+        return self.grow()
 
-        if inside(seed,image_shape)!=True:
-            print "The seed is out of the image range."
-            return False
 
-        region_size = 1
-        origin_t = image[x,y,z]
-        tmp_image = np.zeros_like(image)
-        self.inner_image = np.zeros_like(image)
+class Seeds:
+    """
+    Seeds.
+    """
+    def __init__(self, seeds_type, value):
+        """
+        Init seeds.
+        Parameters
+        -----------------------------------------------------
+        seeds_type: 'separation', 'union', 'random'
+        value: a set of coordinates or a region mask.
+        """
+        if seeds_type is not 'separation' or seeds_type is not 'union' or seeds_type is not 'random':
+            raise ValueError("The input seeds type error!")
+        else:
+            self.set_seeds_type(seeds_type)
 
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free,4))
+        if not isinstance(value, np.ndarray):
+            if  isinstance(value, nib.nifti1.Nifti1Image):
+                self.set_seeds_value(value)
+            else:
+                raise ValueError("The value must be  a 1D/2D/3D ndarray or Nifti1Image format file.!")
 
-        while region_size <= Num:
-            for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
-                xn,yn,zn = x+set0,y+set1,z+set2
-                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
-                    neighbor_pos = neighbor_pos+1
-                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
-                    tmp_image[xn,yn,zn] = 1
+        else:
+            self.set_seeds_value(value)
 
-            tmp_image[x,y,z] = 2
-            self.inner_image[x,y,z] = image[x,y,z]
-            region_size += 1
+    def set_seeds_type(self, seeds_type):
+        """
+        Set the seeds type.
+        """
+        self.seeds_type = seeds_type
 
-            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
-            index = distance.argmin()
-            x,y,z = neighbor_list[index][:3]
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
+    def get_seeds_type(self):
+        """
+        Get the seeds type.
+        """
+        return self.seeds_type
 
-        return self.inner_image
+    def set_seeds_value(self, value):
+        """
+        Set the seeds type.
+        """
+        self.value = value
+
+    def get_seeds_value(self):
+        """
+        Get the seeds value.
+        """
+        return self.value
+
 
 class SimilarityCriteria:
     """
     Distance measure.
     """
-
-    def __init__(self, X, name='euclidean', similarity_direction='seed'):
+    def __init__(self, region, raw_image, similarity_type='difference', name='euclidean', reference='seed'):
         """
         Parameters
         -----------------------------------------------------
-        X: A matrix contain m n-dimensional row vectors.
-        name: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect.
-        similarity_direction: 'seed', 'neighbor', 'mutual'
+        region:The region growing.
+        raw_image: The raw image.
+        similarity_type:'size', 'intensity', 'homogeneity ' or 'deference'. Default is 'difference'.
+        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
         """
-        if not isinstance(X, np.ndarray):
-            raise ValueError("The input X matrxi must be np.ndarray type. ")
+        if not isinstance(region, np.ndarray):
+            raise ValueError("The input region  must be ndarray type. ")
+
+        if not isinstance(raw_image, np.ndarray):
+            raise ValueError("The input raw_image  must be ndarray type. ")
+        self.set_metric(region, raw_image)
 
         if not isinstance(name, str):
             raise ValueError("The value of name must be str type. ")
         else:
-            self.set_name(name)
-        if not isinstance(similarity_direction, str):
-            raise ValueError("The value of similarity direction must be str type. ")
+            self.set_metric(name)
+
+        if not isinstance(reference, str):
+            raise ValueError("The value of reference must be str type. ")
         else:
-            self.set_similarity_direction(similarity_direction)
+            self.set_reference(reference)
 
     def set_name(self, name):
         """
@@ -148,94 +170,141 @@ class SimilarityCriteria:
 
     def get_name(self):
         """
-        Get the name of the distance used in the region growing.
+        Get the name the distance used in the region growing.
         """
         return self.name
 
-    def set_similarity_direction(self, similarity_direction):
+    def set_metric(self, region, raw_image):
         """
-        Set the similarity direction.
+        Set the similarity metric.
         """
         from scipy.spatial.distance import pdist
 
-        self.similarity_direction = pdist(self.X, similarity_direction)
+        self.metric = pdist(self, region.flatten(), raw_image.flatten())
 
-    def get_similarity_direction(self):
+    def get_metric(self):
         """
-        Get the similarity direction.
+        Get the similarity metric.
         """
-        return self.similarity_direction
+        return self.metric
+
+    def set_reference(self, reference):
+        """
+        Set the similarity reference.
+        """
+        self.reference = reference
+
+    def get_reference(self):
+        """
+        Get the similarity reference.
+        """
+        return self.reference
+
 
 class StopCriteria:
     """
     Stop criteria.
     """
-    def __init__(self, name, mode, value):
+    def __init__(self, stop_type='difference', value=None):
         """
         Parameters
         -----------------------------------------------------
-        name: 'size' or 'homogeneity',  means the size or the homogeneity of the region.
-        mode: 'fixed' or 'adaptive', means the threshold should be fixed value or adaptive.
+        stop_type: 'size' , 'intensity', 'homogeneity' or 'deference'. Default is 'difference'.
         value: fixed value, it should be none when mode is equal to 'adaptive'.
         """
-
-        if not isinstance(name, str):
+        if not isinstance(stop_type, str):
             raise ValueError("The name must be str type. ")
-        elif name is not 'size' and name is not 'homogeneity':
+        elif stop_type is not 'size' and stop_type is not 'homogeneity' and \
+              stop_type is not 'intensity' and stop_type is not 'difference':
             raise ValueError("The name must be 'size' or 'homogeneity'.")
         else:
-            self.set_name(name)
-
-        if not isinstance(mode, str):
-            raise ValueError("The mode must be str type. ")
-        elif mode is not 'fixed' and mode is not 'adaptive':
-            raise ValueError("The mode must be 'fixed' or 'adaptive'.")
-        else:
-            self.set_mode(mode)
+            self.set_type(stop_type)
 
         if not isinstance(value, float) and not isinstance(value, int):
             raise ValueError("The value must be float or int type.")
         else:
             self.set_value(value)
 
-    def set_name(self, name):
+    def set_type(self, stop_type):
         """
         Set the name of the stop criteria.
         """
-        self.name = name
+        self.stop_type = stop_type
 
-    def get_name(self):
+    def get_type(self):
         """
         Get the name of the stop criteria.
         """
-        return self.name
-
-    def set_mode(self, mode):
-        """
-        Set the mode of the stop criteria.
-        """
-        self.mode = mode
-
-    def get_mode(self):
-        """
-        Get the mode of the stop criteria.
-        """
-        return self.mode
+        return self.stop_type
 
     def set_value(self, value):
         """
         Set the value of the stop criteria.
         """
-        if self.get_mode() == 'adaptive':
-            self.value = None
-        else:
-            self.value = value
+        self.value = value
 
-    def get_value(self, value):
+    def get_value(self):
         """
         Get the value of the stop criteria.
         """
         return self.value
+
+class RegionOptimizer:
+    """
+    Region optimizer.
+    """
+    def __init__(self, region_sequence, raw_image, name, optimizing, optpara=None):
+        """
+        Parameters
+        -----------------------------------------------------
+        region_sequence: A series of regions.
+        raw_image: Raw image.
+        name:The name of the region optimizer method.
+        optimizing:
+        optpara: Default is None.Optional parameter
+        """
+        if not isinstance(region_sequence, np.ndarray):
+            raise ValueError("The input region sequence  must be ndarray type. ")
+
+        if not isinstance(raw_image, np.ndarray):
+            raise ValueError("The input raw image  must be np.ndarray type. ")
+
+    def set_name(self, name):
+        """
+        Set the name of the region optimizer.
+        """
+        self.name = name
+
+    def get_name(self):
+        """
+        Get the name of the  region optimizer.
+        """
+        return self.name
+
+    def set_optimizing(self, optimizing):
+        """
+        Set the optimizing of the  region optimizer.
+        """
+        self.optimizing = optimizing
+
+    def get_optimizing(self):
+        """
+        Get the optimizing of the  region optimizer.
+        """
+        return self.optimizing
+
+    def set_optpara(self, optpara):
+        """
+        Set the optional parameter of the  region optimizer.
+        """
+        self.optpara = optpara
+
+    def get_optpara(self):
+        """
+        Get the optional parameter of the  region optimizer.
+        """
+        return self.optpara
+
 
 class FixedThresholdSRG(RegionGrowing):
     """
@@ -251,7 +320,7 @@ class FixedThresholdSRG(RegionGrowing):
         """
         RegionGrowing.__init__(self)
         if not isinstance(target_image, nib.nifti1.Nifti1Image):
-            if len(target_image.get_shape()) > 3 or len(target_image.get_shape()) <2:
+            if len(target_image.get_shape()) > 3 or len(target_image.get_shape()) < 2:
                 raise ValueError("Must be a 2D/3D or Nifti1Image format file.")
             else:
                 target_image = target_image.get_data()
@@ -286,126 +355,52 @@ class FixedThresholdSRG(RegionGrowing):
         """
         Set the connectivity.
         """
-        self.connectivity = connectivity
+        self.connectivity = compute_offsets(len(self.target_image), int(connectivity))
 
     def get_connectivity(self):
         """
         Get the connectivity.
         """
-        return self.get_connectivity()
+        return self.connectivity
 
     def grow(self):
         """
         Fixed threshold region growing.
         """
-        Q = []
-        #list of new picture point
-        s = []
+        seed = self.get_seed()
+        image_shape = self.target_image
 
-        if len(self.target_image.shape) == 2:
-            #(x,y) start point
-            x, y = self.seed
+        if inside(self.get_seed(), image_shape):
+            raise ValueError("The seed is out of the image range.")
 
-            #the function to transfer image to grey-scale map
-            image = self.target_image.convert("L")
-            Q.insert((x, y))
+        region_size = 1
+        origin_t = self.target_image[seed]
+        tmp_image = np.zeros_like(self.target_image)
+        self.inner_image = np.zeros_like(self.target_image)
 
-            while len(Q) != 0:
-                t = Q.pop()
-                x = t[0]
-                y = t[1]
-                if self.get_connectivity() == '6':
-                    #in the size of picture and the gradient difference is not so large
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free, 4))
 
-                    if x < image.size[0] - 1 and \
-                            abs(image.getpixel((x + 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
+        while region_size <= self.stop_criteria.get_value():
+            for i in range(self.get_connectivity()):
+                seedn = (np.array(seed) + self.get_connectivity()[i]).tolist()
+                if inside(seedn, image_shape) and tmp_image[seedn] == 0:
+                    neighbor_pos = neighbor_pos + 1
+                    neighbor_list[neighbor_pos] = [seedn, self.target_image[seedn]]
+                    tmp_image[seedn] = 1
 
-                        if not (x + 1, y) in Q and not (x + 1, y) in s:
-                            Q.insert((x + 1, y))
+            tmp_image[seed] = 2
+            self.inner_image[seed] = self.target_image[seed]
+            region_size += 1
 
+            distance = np.abs(neighbor_list[:neighbor_pos + 1, len(image_shape)] - np.tile(origin_t, neighbor_pos + 1))
+            index = distance.argmin()
+            seed = neighbor_list[index][:len(image_shape)]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+        return self.inner_image
 
-                    if x > 0 and \
-                            abs(image.getpixel((x - 1, y)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
-
-                        if not (x - 1, y) in Q and not (x - 1, y) in s:
-                            Q.insert((x - 1, y))
-
-                    if y < (image.size[1] - 1) and \
-                            abs(image.getpixel((x, y + 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
-
-                        if not (x, y + 1) in Q and not (x, y + 1) in s:
-                            Q.insert((x, y + 1))
-
-                    if y > 0 and \
-                            abs( image.getpixel((x, y - 1)) - image.getpixel((x, y))) <= self.stop_criteria.get_value():
-                        if not (x, y - 1) in Q and not (x, y - 1) in s:
-                            Q.insert((x, y - 1))
-
-                    if t not in s:
-                        s.append(t)
-
-                image.load()
-                putpixel = image.im.putpixel
-
-                for i in range(image.size[0]):
-                    for j in range(image.size[1]):
-                        putpixel( (i, j), 0)
-
-                for i in s:
-                    putpixel(i, 150)
-                return image
-        elif len(self.target_image.shape) == 3:
-            #define function(original image\gradient difference\start point)radient
-            Q = []
-            s = []
-
-            x, y, z = self.seed
-            Q.insert((x, y, z))
-
-            while len(Q) != 0:
-                t = Q.pop()
-                x = t[0]
-                y = t[1]
-                z = t[2]
-
-                if self.get_connectivity() == '6':
-                    if x < self.target_image.shape[0] and \
-                            abs(self.target_image[x + 1, y, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                        if not (x + 1, y, z)in Q and not (x + 1, y, z) in s:
-                            Q.insert((x + 1, y, z))
-
-                    if x > 0 and abs(self.target_image[x - 1, y, z] -
-                        self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                        if not (x - 1, y, z) in Q and not (x - 1, y, z) in s:
-                            Q.insert((x - 1, y, z))
-
-                    if y < self.target_image.shape[1] and \
-                            abs(self.target_image[x, y + 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                        if not (x, y + 1,z) in Q and not (x, y + 1, z) in s:
-                            Q.insert((x, y + 1, z))
-
-                    if y > 0 and \
-                            abs(self.target_image[x, y - 1, z] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                        if not (x, y - 1 ,z) in Q and not (x, y - 1, z) in s:
-                            Q.insert((x, y - 1, z))
-
-                    if z < self.target_image.shape[2] and \
-                            abs(self.target_image[x, y, z + 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                        if not (x, y, z + 1) in Q and not (x, y, z + 1) in s:
-                            Q.insert((x, y, z + 1))
-
-                    if z > 0 and \
-                            abs(self.target_image[x, y, z - 1] - self.target_image[x, y, z]) <= self.stop_criteria.get_value():
-                        if not (x, y, z - 1) in Q and not (x, y, z - 1) in s:
-                            Q.insert((x, y, z - 1))
-                    if t not in s:
-                        s.append(t)
-
-                array = np.array(s).transpose()
-                self.output = self.target_image.copy()
-                self.output[array[:][0], array[:][1], array[:][2]] = 1
-
-                return self.output
 
 class fixed_region_grow(RegionGrowing):
     """
@@ -436,6 +431,7 @@ class fixed_region_grow(RegionGrowing):
         """
         #N = self.get_stop_criteria().value
         return self.grow(image, seed, Num)
+
 
 class Average_contrast(RegionGrowing):
     """
@@ -473,7 +469,7 @@ class Average_contrast(RegionGrowing):
                 set0,set1,set2 = compute_offsets(3,26)[i]
                 xn,yn,zn = x+set0,y+set1,z+set2
                 if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
-                    neighbor_pos = neighbor_pos+1
+                    neighbor_pos = neighbor_pos + 1
                     neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
                     tmp_image[xn,yn,zn] = 1
 
@@ -549,7 +545,6 @@ class Peripheral_contrast(RegionGrowing):
                 else:
                     inner_b= np.vstack((inner_b,i))
         return np.array(inner_b)
-
 
     def set_stop_criteria(self, image, seed, Num):
         """
