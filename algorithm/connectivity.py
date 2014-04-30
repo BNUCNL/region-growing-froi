@@ -1,6 +1,7 @@
 
 import numpy as np
 
+
 def compute_offsets(nbdim, nbsize):
     """
     compute the offsets.
@@ -28,7 +29,8 @@ def compute_offsets(nbdim, nbsize):
                                 [-1, -1],
                                 [1, -1],
                                 [-1, 1]])
-        else: raise ValueError("2D data must be 4/6/8 neighbors.")
+        else:
+            raise ValueError("2D data must be 4/6/8 neighbors.")
     elif nbdim == 3:
         # 3D volume 6, 18, 26-connected
         if nbsize == 6:
@@ -118,6 +120,9 @@ def compute_offsets(nbdim, nbsize):
                                 [1, 1, 1]])
         else:
             raise ValueError("4D data must be 26 neighbors.")
+    else:
+        raise ValueError("Input data dimension error!.")
+
     return offsets
 
 
