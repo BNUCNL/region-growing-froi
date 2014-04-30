@@ -1,7 +1,7 @@
 import numpy as np
 import nibabel as nib
-from connectivity import compute_offsets
-from whetherinside import inside
+from utils import compute_offsets
+from utils import inside
 
 
 class RegionGrowing:
