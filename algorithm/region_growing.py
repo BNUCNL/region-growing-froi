@@ -9,7 +9,7 @@ class RegionGrowing:
     Base class in region growing.
 
     """
-    def __init__(self, target_image, seed, stop_criteria, connectivity='8', similarity_criteria='euclidean', mask_image=None):
+    def __init__(self, target_image, seed, stop_type, value, connectivity='8', similarity_criteria='euclidean', mask_image=None):
         """
          Parameters
         ----------
@@ -17,11 +17,15 @@ class RegionGrowing:
         seed: the seed points.
         stop_criteria: The stop criteria of region growing to stop.
         """
-        if not isinstance(target_image, nib.nifti1.Nifti1Image):
-            if len(target_image.get_shape()) > 4 or len(target_image.get_shape()) < 2:
-                raise ValueError("Must be Nifti1Image format file.")
-        elif len(target_image.shape) > 4 or len(target_image.shape) < 2:
-            raise ValueError("Must be a 2D/3D/4D data.")
+        if isinstance(target_image, nib.nifti1.Nifti1Image):
+            target_image = target_image.get_data()
+            if len(target_image.shape) > 4 or len(target_image.shape) < 2:
+                raise ValueError("Must be a 2D/3D/4D nifti1.Nifti1Image data format.")
+        elif isinstance(target_image, np.ndarray):
+            if len(target_image.shape) > 4 or len(target_image.shape) < 2:
+                raise ValueError("Must be a 2D/3D/4D data.")
+        else:
+            raise ValueError("Must be a nifti1.Nifti1Image data format..")
 
         if not isinstance(seed, np.ndarray):
             self.seed = np.array(seed)
@@ -62,11 +66,11 @@ class RegionGrowing:
         """
         return self.get_connectivity()
 
-    def set_stop_criteria(self, stop_criteria):
+    def set_stop_criteria(self, stop_type, value):
         """
         Set the stop criteria.
         """
-        return self.set_stop_criteria(stop_criteria)
+        return self.set_stop_criteria(stop_type, value)
 
     def get_stop_criteria(self):
         """
@@ -310,7 +314,7 @@ class FixedThresholdSRG(RegionGrowing):
     """
     Region growing with a fixed threshold.
     """
-    def __init__(self, target_image, seed, value, connectivity='6'):
+    def __init__(self, target_image, seed, stop_type='difference', value=None, connectivity='6'):
         """
         Parameters
         -----------------------------------------------------
@@ -318,18 +322,20 @@ class FixedThresholdSRG(RegionGrowing):
         seed: the seed points.
         value the stop threshold.
         """
-        RegionGrowing.__init__(self)
-        if not isinstance(target_image, nib.nifti1.Nifti1Image):
-            if len(target_image.get_shape()) > 3 or len(target_image.get_shape()) < 2:
+        RegionGrowing.__init__(self, target_image, seed, stop_type='difference', value=None, connectivity='6')
+        if isinstance(target_image, nib.nifti1.Nifti1Image):
+            target_image = target_image.get_data()
+            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
                 raise ValueError("Must be a 2D/3D or Nifti1Image format file.")
-            else:
-                target_image = target_image.get_data()
-        elif len(target_image.shape) > 3 or len(target_image.shape) < 2:
-            raise ValueError("Must be a 2D/3D data.")
+        elif isinstance(target_image, np.ndarray):
+            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
+                raise ValueError("Must be a 2D/3D data.")
+        else:
+            raise ValueError("Must be a nifti1.Nifti1Image data format..")
 
         self.target_image = target_image
         self.set_seed(seed)
-        self.set_stop_criteria(value)
+        self.set_stop_criteria(stop_type, value)
         self.set_connectivity(connectivity)
 
     def set_seed(self, seed):
@@ -338,12 +344,11 @@ class FixedThresholdSRG(RegionGrowing):
     def get_seed(self):
         return self.seed
 
-
-    def set_stop_criteria(self, stop_criteria):
+    def set_stop_criteria(self, stop_type, stop_criteria):
         """
         Set the stop criteria.
         """
-        self.stop_criteria = StopCriteria('size', 'fixed', stop_criteria)
+        self.stop_criteria = StopCriteria(stop_type, stop_criteria)
 
     def get_stop_criteria(self):
         """
@@ -355,7 +360,7 @@ class FixedThresholdSRG(RegionGrowing):
         """
         Set the connectivity.
         """
-        self.connectivity = compute_offsets(len(self.target_image), int(connectivity))
+        self.connectivity = compute_offsets(len(self.target_image.shape), int(connectivity))
 
     def get_connectivity(self):
         """
@@ -367,10 +372,10 @@ class FixedThresholdSRG(RegionGrowing):
         """
         Fixed threshold region growing.
         """
-        seed = self.get_seed()
-        image_shape = self.target_image
+        seed = self.get_seed()[0]
+        image_shape = self.target_image.shape
 
-        if inside(self.get_seed(), image_shape):
+        if not inside(np.array(seed), image_shape):
             raise ValueError("The seed is out of the image range.")
 
         region_size = 1
@@ -383,7 +388,7 @@ class FixedThresholdSRG(RegionGrowing):
         neighbor_list = np.zeros((neighbor_free, 4))
 
         while region_size <= self.stop_criteria.get_value():
-            for i in range(self.get_connectivity()):
+            for i in range(0, self.get_connectivity().shape[1]):
                 seedn = (np.array(seed) + self.get_connectivity()[i]).tolist()
                 if inside(seedn, image_shape) and tmp_image[seedn] == 0:
                     neighbor_pos = neighbor_pos + 1
