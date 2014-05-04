@@ -442,12 +442,39 @@ class Average_contrast(RegionGrowing):
     """
     Max average contrast region growing.
     """
-    def __init__(self, target_image, seed, Thres):
+    def __init__(self, target_image, seed, Thres, connectivity):
         if not isinstance(seed,np.ndarray):
             seed = np.array(seed)
         self.target_image = target_image
         self.set_seed(seed)
-        self.set_stop_criteria(target_image, seed, Thres)
+        self.get_seed()
+        self.get_thres = Thres
+        self.set_connectivity(connectivity)
+        self.get_connectivity()
+
+    def set_seed(self, seed):
+        """
+        Set the seed points.
+        """
+        self.seed = seed
+
+    def get_seed(self):
+        """
+        Return the seed points.
+        """
+        return self.seed
+
+    def set_connectivity(self, connectivity):
+        """
+        Set the connectivity.
+        """
+        self.connectivity = connectivity
+
+    def get_connectivity(self):
+        """
+        Get the connectivity.
+        """
+        return self.connectivity
 
     def set_stop_criteria(self, image, seed, Num):
         """
@@ -470,8 +497,8 @@ class Average_contrast(RegionGrowing):
         neighbor_list = np.zeros((neighbor_free,4))
 
         while region_size <= Num:
-            for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
+            for i in range(self.get_connectivity()):
+                set0,set1,set2 = compute_offsets(len(image.shape),self.get_connectivity())[i]
                 xn,yn,zn = x+set0,y+set1,z+set2
                 if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
                     neighbor_pos = neighbor_pos + 1
@@ -492,13 +519,13 @@ class Average_contrast(RegionGrowing):
 
             distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
             index = distance.argmin()
-            x,y,z = neighbor_list[index][:3]
+            x,y,z = neighbor_list[index][:len(image.shape)]
             inner_list = inner_list + [image[x,y,z]]
             neighbor_list[index] = neighbor_list[neighbor_pos]
             neighbor_pos -= 1
         number = int(np.array(contrast).argmax()+1)
         print number
-        self.stop_criteria = StopCriteria('size','fixed',number)
+        self.stop_criteria = StopCriteria('size',number)
 
     def get_stop_criteria(self):
         """
@@ -506,13 +533,45 @@ class Average_contrast(RegionGrowing):
         """
         return self.stop_criteria
 
-    def _grow(self, image, seed, Num):
+    def grow(self):
         """
         Average contrast growing.
         """
+        seed = self.get_seed()
+        image_shape = self.target_image.shape
+        image = self.target_image
+        Num = self.get_thres
         self.set_stop_criteria(image, seed, Num)
-        N = self.get_stop_criteria().value
-        return self.grow(image, seed, N)
+        N = self.get_stop_criteria()
+
+        region_size = 1
+        origin_t = self.target_image[seed]
+        tmp_image = np.zeros_like(self.target_image)
+        self.inner_image = np.zeros_like(self.target_image)
+
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free, len(image.shape)+1))
+
+        while region_size <= N:
+            for i in range(self.get_connectivity()):
+                set0,set1,set2 = compute_offsets(len(image.shape),self.get_connectivity())[i]
+                xn,yn,zn = seed[0]+set0,seed[1]+set1,seed[2]+set2
+                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
+                    neighbor_pos = neighbor_pos + 1
+                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
+                    tmp_image[xn,yn,zn] = 1
+
+            tmp_image[seed] = 2
+            self.inner_image[seed] = self.target_image[seed]
+            region_size += 1
+
+            distance = np.abs(neighbor_list[:neighbor_pos + 1, len(image_shape)] - np.tile(origin_t, neighbor_pos + 1))
+            index = distance.argmin()
+            seed = neighbor_list[index][:len(image_shape)]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+        return self.inner_image
 
 
 class Peripheral_contrast(RegionGrowing):
@@ -633,21 +692,23 @@ class Peripheral_contrast(RegionGrowing):
 if __name__ == "__main__":
     t_image = nib.load('../data/S2/tstat1.nii.gz')
     data = t_image.get_data()
-    A = Average_contrast(data, (26,38,25), 1000)
-    new_image = A._grow(data, (26,38,25), 1000)
+    A = Average_contrast(data, (26,38,25), 1000, 26)
+    new_image = A.grow()
     t_image._data = new_image
     nib.save(t_image,'ACB_S2_image.nii.gz')
     print 'average contrast growing has been saved.'
+
     #B = Peripheral_contrast(data, (26,38,25), 1000)
     #new_image = B._grow(data, (26,38,25), 1000)
     #t_image._data = new_image
     #nib.save(t_image,'PCB_S2_image')
     #print 'peripheral contrast growing has been saved.'
-    C = fixed_region_grow(data,(26,38,25),200)
-    new_image = C._grow(data,(26,38,25),200)
-    t_image._data = new_image
-    nib.save(t_image,'fixed_thres_S2_image.nii.gz')
-    print 'fixed threshold growing has been saved.'
+
+    #C = fixed_region_grow(data,(26,38,25),200)
+    #new_image = C._grow(data,(26,38,25),200)
+    #t_image._data = new_image
+    #nib.save(t_image,'fixed_thres_S2_image.nii.gz')
+    #print 'fixed threshold growing has been saved.'
 
 
 
