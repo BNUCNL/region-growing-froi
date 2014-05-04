@@ -12,6 +12,7 @@ if __name__ == "__main__":
     affine = img.get_affine()
     target_image = img.get_data()
     seed = [(25, 41, 25)]
-    fixed_threshold_srg = FixedThresholdSRG(target_image, seed, stop_type='difference', value=5, connectivity='6')
+    fixed_threshold_srg = FixedThresholdSRG(target_image, seed, stop_type='size', value=500, connectivity='6')
     output = fixed_threshold_srg.grow()
+    nib.save(nib.Nifti1Image(output, affine), "../tests/FixedThresholdSRG.nii.gz")
     print '--------------------------END-------------------------'

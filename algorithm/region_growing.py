@@ -379,24 +379,25 @@ class FixedThresholdSRG(RegionGrowing):
             raise ValueError("The seed is out of the image range.")
 
         region_size = 1
-        origin_t = self.target_image[seed]
+        origin_t = self.target_image[tuple(seed)]
         tmp_image = np.zeros_like(self.target_image)
         self.inner_image = np.zeros_like(self.target_image)
 
         neighbor_free = 10000
         neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free, 4))
+        neighbor_list = np.zeros((neighbor_free, len(image_shape) + 1))
 
         while region_size <= self.stop_criteria.get_value():
             for i in range(0, self.get_connectivity().shape[1]):
                 seedn = (np.array(seed) + self.get_connectivity()[i]).tolist()
-                if inside(seedn, image_shape) and tmp_image[seedn] == 0:
+                if inside(seedn, image_shape) and tmp_image[tuple(seedn)] == 0:
                     neighbor_pos = neighbor_pos + 1
-                    neighbor_list[neighbor_pos] = [seedn, self.target_image[seedn]]
-                    tmp_image[seedn] = 1
+                    neighbor_list[neighbor_pos][0:len(image_shape)] = seedn
+                    neighbor_list[neighbor_pos][len(image_shape)-1] = self.target_image[tuple(seedn)]
+                    tmp_image[tuple(seedn)] = 1
 
-            tmp_image[seed] = 2
-            self.inner_image[seed] = self.target_image[seed]
+            tmp_image[tuple(seed)] = 2
+            self.inner_image[tuple(seed)] = self.target_image[tuple(seed)]
             region_size += 1
 
             distance = np.abs(neighbor_list[:neighbor_pos + 1, len(image_shape)] - np.tile(origin_t, neighbor_pos + 1))
@@ -404,6 +405,7 @@ class FixedThresholdSRG(RegionGrowing):
             seed = neighbor_list[index][:len(image_shape)]
             neighbor_list[index] = neighbor_list[neighbor_pos]
             neighbor_pos -= 1
+            print 'region size...:', region_size
         return self.inner_image
 
 
@@ -498,7 +500,7 @@ class Average_contrast(RegionGrowing):
             neighbor_pos -= 1
         number = int(np.array(contrast).argmax()+1)
         print number
-        self.stop_criteria = StopCriteria('size','fixed',number)
+        self.stop_criteria = StopCriteria('size', 'fixed', number)
 
     def get_stop_criteria(self):
         """
