@@ -407,37 +407,6 @@ class FixedThresholdSRG(RegionGrowing):
         return self.inner_image
 
 
-class fixed_region_grow(RegionGrowing):
-    """
-    Fixed threshold region growing.
-    """
-    def __init__(self, target_image, seed, Thres):
-        if not isinstance(seed,np.ndarray):
-            seed = np.array(seed)
-        self.target_image = target_image
-        self.set_seed(seed)
-        self.set_stop_criteria(Thres)
-
-    def set_stop_criteria(self, stop_criteria):
-        """
-        Set the stop criteria.
-        """
-        self.stop_criteria = stop_criteria
-
-    def get_stop_criteria(self):
-        """
-        Return the stop criteria.
-        """
-        return self.stop_criteria
-
-    def _grow(self, image, seed, Num):
-        """
-        Average contrast growing.
-        """
-        #N = self.get_stop_criteria().value
-        return self.grow(image, seed, Num)
-
-
 class Average_contrast(RegionGrowing):
     """
     Max average contrast region growing.
