@@ -30,6 +30,7 @@ class Seeds:
         """
         return self.generating()
 
+
 class RandomSeeds(Seeds):
     """
     Seeds.
@@ -271,11 +272,11 @@ class SeededRegionGrowing:
     def get_seeds(self):
         return self.seeds
 
-    def set_stop_criteria(self, stop_type, stop_criteria):
+    def set_stop_criteria(self, region, stop_type, stop_criteria):
         """
         Set the stop criteria.
         """
-        self.stop_criteria = StopCriteria(stop_type, stop_criteria)
+        self.stop_criteria = StopCriteria(region, stop_type, stop_criteria)
 
     def get_stop_criteria(self):
         """
@@ -346,6 +347,86 @@ class SeededRegionGrowing:
             neighbor_pos -= 1
         return self.inner_image
 
+
+class Aggregator:
+    """
+    Seeded region growing based on random seeds.
+    """
+    def __init__(self, seeds, region_sequence, raw_image, aggregator_type='average'):
+        """
+        Parameters
+        -----------------------------------------------------
+        region_sequence: A series of regions.
+        raw_image: raw image.
+        aggregator_type: 'average', 'magnitude', 'homogeneity', default is 'average'.
+        """
+        if not isinstance(seeds, list):
+            raise ValueError("The input seeds  must be list type. ")
+
+        if not isinstance(region_sequence, np.ndarray):
+            raise ValueError("The input region sequence  must be ndarray type. ")
+
+        if not isinstance(raw_image, np.ndarray):
+            raise ValueError("The input raw_image  must be ndarray type. ")
+
+        if not isinstance(aggregator_type, str):
+            raise ValueError("The value of aggregator_type must be str type. ")
+
+    def set_seeds(self, seeds):
+        self.seeds = seeds
+
+    def get_seeds(self):
+        return self.seeds
+
+    def aggregator(self):
+        """
+        Aggregation for different regions
+        """
+
+class RandomSRG:
+    """
+    Seeded region growing based on random seeds.
+    """
+    def __init__(self, n_seeds, stop_criteria,):
+        """
+        Parameters
+        -----------------------------------------------------
+        n_seeds: n seeds.
+        stop_criteria: stop criteria about the n regions from n seeds.
+        """
+        if not isinstance(n_seeds, list):
+            raise ValueError("The input seeds  must be list type. ")
+        else:
+            self.set_seeds(n_seeds)
+        self.aggregator()
+
+
+    def set_seeds(self, seeds):
+        self.seeds = seeds
+
+    def get_seeds(self):
+        return self.seeds
+
+    def set_stop_criteria(self, region, stop_type, stop_criteria):
+        """
+        Set the stop criteria.
+        """
+        self.stop_criteria = StopCriteria(region, stop_type, stop_criteria)
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def aggregator(self):
+        """
+        Aggregation for different regions
+        """
+        n_regions = None
+        raw_image = None
+        self.aggregator = Aggregator(self.seeds, n_regions, raw_image)
+        self.aggregator.aggregator()
 
 class fixed_region_grow:
     """
