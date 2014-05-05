@@ -347,22 +347,37 @@ class SeededRegionGrowing:
         return self.inner_image
 
 
-class fixed_region_grow:
+class AdaptiveSRG(SeededRegionGrowing):
     """
-    Fixed threshold region growing.
+    Adaptive seeded region growing.
     """
-    def __init__(self, target_image, seed, Thres):
-        if not isinstance(seed,np.ndarray):
+    def __init__(self, target_image, seed, Thres, connectivity):
+        if not isinstance(seed, np.ndarray):
             seed = np.array(seed)
         self.target_image = target_image
-        self.set_seed(seed)
-        self.set_stop_criteria(Thres)
+        self.set_seeds(seed)
+        self.get_seeds()
+        self.git_thres = Thres
+        self.set_connectivity(connectivity)
+        self.get_connectivity()
 
-    def set_stop_criteria(self, stop_criteria):
+    def set_seeds(self, seeds):
+        """
+        Set the seeds.
+        """
+        self.seeds = seeds
+
+    def get_seeds(self):
+        """
+        Get the seeds.
+        """
+        return self.seeds
+
+    def set_stop_criteria(self, stop_type, stop_criteria):
         """
         Set the stop criteria.
         """
-        self.stop_criteria = stop_criteria
+        self.stop_criteria = StopCriteria(stop_type, stop_criteria)
 
     def get_stop_criteria(self):
         """
@@ -370,12 +385,66 @@ class fixed_region_grow:
         """
         return self.stop_criteria
 
-    def _grow(self, image, seed, Num):
+    def set_connectivity(self, connectivity):
         """
-        Average contrast growing.
+        Set the connectivity.
         """
-        #N = self.get_stop_criteria().value
-        return self.grow(image, seed, Num)
+        self.connectivity = compute_offsets(len(self.target_image.shape), int(connectivity))
+
+    def get_connectivity(self):
+        """
+        Get the connectivity.
+        """
+        return self.connectivity
+
+    def set_similarity_criteria(self, similarity_criteria):
+        """
+        Set the similarity criteria.
+        """
+        self.set_similarity_criteria(similarity_criteria)
+
+    def get_similarity_criteria(self):
+        """
+        Get the similarity criteria.
+        """
+        return self.get_similarity_criteria()
+
+    def average_contrast(self):
+        """
+        return average contrast list.
+        """
+        return self.average_contrast()
+
+    def peripheral_contrast(self):
+        """
+        return peripheral contrast list.
+        """
+        return self.peripheral_contrast()
+
+    def grow(self):
+        """
+        Adaptive region growing.
+        """
+        region_list = []
+        for i in range(20,1000,20):
+            region_list[i/20-1] = SeededRegionGrowing.grow()
+        return region_list
+
+
+    def region_optimizer(self, region_list, opt_measurement):
+        contrast = []
+        if opt_measurement != 'average' and opt_measurement != 'peripheral':
+            raise ValueError("The optimize measurement must be average or peripheral contrast.")
+        elif opt_measurement == 'average':
+            for i in range(20,1000,20):
+                contrast[i/20-1] = self.average_contrast()[i]
+            k = np.array(contrast).argmax()
+            return region_list[k]
+        else:
+            for i in range(20,1000,20):
+                contrast[i/20-1] = self.peripheral_contrast()[i]
+            k = np.array(contrast).argmax()
+            return region_list[k]
 
 
 class Average_contrast:
@@ -578,16 +647,18 @@ if __name__ == "__main__":
     t_image._data = new_image
     nib.save(t_image,'ACB_S2_image.nii.gz')
     print 'average contrast growing has been saved.'
+
     #B = Peripheral_contrast(data, (26,38,25), 1000)
     #new_image = B._grow(data, (26,38,25), 1000)
     #t_image._data = new_image
     #nib.save(t_image,'PCB_S2_image')
     #print 'peripheral contrast growing has been saved.'
-    C = fixed_region_grow(data,(26,38,25),200)
-    new_image = C._grow(data,(26,38,25),200)
-    t_image._data = new_image
-    nib.save(t_image,'fixed_thres_S2_image.nii.gz')
-    print 'fixed threshold growing has been saved.'
+
+    #C = fixed_region_grow(data,(26,38,25),200)
+    #new_image = C._grow(data,(26,38,25),200)
+    #t_image._data = new_image
+    #nib.save(t_image,'fixed_thres_S2_image.nii.gz')
+    #print 'fixed threshold growing has been saved.'
 
 
 
