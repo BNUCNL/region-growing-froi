@@ -2,13 +2,39 @@ import numpy as np
 import nibabel as nib
 from utils import compute_offsets
 from utils import inside
+import random
 
 
 class Seeds:
     """
     Seeds.
     """
-    def __init__(self, seeds_type, value):
+    def __init__(self, seeds):
+        """
+        Init seeds.
+        Parameters
+        -----------------------------------------------------
+        seeds: a set of coordinates or a region mask
+        """
+        if not isinstance(seeds, np.ndarray):
+            if  isinstance(seeds, nib.nifti1.Nifti1Image) or isinstance(seeds, list):
+                self.generating(seeds)
+            else:
+                raise ValueError("The value must be  a 1D/2D/3D ndarray or Nifti1Image format file.!")
+        else:
+            self.generating(seeds)
+
+    def generating(self):
+        """
+        Generating new seeds.
+        """
+        return self.generating()
+
+class RandomSeeds(Seeds):
+    """
+    Seeds.
+    """
+    def __init__(self, seeds, random_number=0):
         """
         Init seeds.
         Parameters
@@ -16,43 +42,21 @@ class Seeds:
         seeds_type: 'separation', 'union', 'random'
         value: a set of coordinates or a region mask.
         """
-        if seeds_type is not 'separation' or seeds_type is not 'union' or seeds_type is not 'random':
-            raise ValueError("The input seeds type error!")
+        Seeds.__init__(seeds)
+        self.seeds = seeds
+        if not isinstance(random_number, int):
+            raise ValueError("The random_number must be int type.")
         else:
-            self.set_seeds_type(seeds_type)
+            self.random_number = random_number
 
-        if not isinstance(value, np.ndarray):
-            if  isinstance(value, nib.nifti1.Nifti1Image):
-                self.set_seeds_value(value)
-            else:
-                raise ValueError("The value must be  a 1D/2D/3D ndarray or Nifti1Image format file.!")
-
+    def generating(self):
+        """
+        Generating new seeds.
+        """
+        if self.random_number == 0:
+            return self.seeds
         else:
-            self.set_seeds_value(value)
-
-    def set_seeds_type(self, seeds_type):
-        """
-        Set the seeds type.
-        """
-        self.seeds_type = seeds_type
-
-    def get_seeds_type(self):
-        """
-        Get the seeds type.
-        """
-        return self.seeds_type
-
-    def set_seeds_value(self, value):
-        """
-        Set the seeds type.
-        """
-        self.value = value
-
-    def get_seeds_value(self):
-        """
-        Get the seeds value.
-        """
-        return self.value
+            return random.sample(self.seeds, self.random_number)
 
 
 class SimilarityCriteria:
@@ -114,7 +118,7 @@ class StopCriteria:
     """
     Stop criteria.
     """
-    def __init__(self, region, raw_image, stop_type='difference', value=None, mask_image=None):
+    def __init__(self, region, raw_image=None, stop_type='difference', value=None, mask_image=None):
         """
         Parameters
         -----------------------------------------------------
@@ -340,7 +344,6 @@ class SeededRegionGrowing:
             seed = neighbor_list[index][:len(image_shape)]
             neighbor_list[index] = neighbor_list[neighbor_pos]
             neighbor_pos -= 1
-            print 'region size...:', region_size
         return self.inner_image
 
 
