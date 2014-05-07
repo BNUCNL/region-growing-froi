@@ -9,7 +9,8 @@ class SeededRegionGrowing:
     """
     Seeded region growing with a fixed threshold.
     """
-    def __init__(self, target_image, seeds, stop_type, value=None, connectivity='8', similarity_criteria='euclidean', mask_image=None):
+    # def __init__(self, target_image, seeds, stop_type, value=None, connectivity='8', similarity_criteria='euclidean', mask_image=None):
+    def __init__(self, seeds, connectivity, similarity_criteria, stop_criteria, region_sequence):
         """
         Parameters
         -----------------------------------------------------
@@ -17,24 +18,20 @@ class SeededRegionGrowing:
         seeds: a set of coordinates or a region mask
         value the stop threshold.
         """
-        if isinstance(target_image, nib.nifti1.Nifti1Image):
-            target_image = target_image.get_data()
-            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
+        if isinstance(region_sequence, nib.nifti1.Nifti1Image):
+            target_image = region_sequence.get_data()
+            if len(target_image.shape) > 4 or len(target_image.shape) < 2:
                 raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
-        elif isinstance(target_image, np.ndarray):
-            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
+        elif isinstance(region_sequence, np.ndarray):
+            if len(region_sequence.shape) > 4 or len(region_sequence.shape) < 2:
                 raise ValueError("Target image must be a 2D/3D data.")
-
-        elif isinstance(mask_image, np.ndarray):
-            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
-                raise ValueError("Mask image must be a 2D/3D data.")
         else:
             raise ValueError("Must be a nifti1.Nifti1Image data format..")
 
         self.target_image = target_image
         self.set_seeds(seeds)
-        self.set_stop_criteria(StopCriteria(stop_type, value))
-        self.set_similarity_criteria(SimilarityCriteria(stop_type, similarity_criteria))
+        self.set_stop_criteria(stop_criteria)
+        self.set_similarity_criteria(similarity_criteria)
         self.set_connectivity(connectivity)
 
     def set_seeds(self, seeds):
@@ -79,7 +76,7 @@ class SeededRegionGrowing:
         """
         return self.get_similarity_criteria()
 
-    def growing(self):
+    def grow(self):
         """
         Fixed threshold region growing.
         """
@@ -144,7 +141,7 @@ class Seeds:
 
 class RandomSeeds(Seeds):
     """
-    Seeds.
+    Random Seeds.
     """
     def __init__(self, seeds, random_number=0):
         """
@@ -173,16 +170,19 @@ class RandomSeeds(Seeds):
 
 class SimilarityCriteria:
     """
-    Distance measure.
+    Similarity criteria..
     """
-    def __init__(self, region, similarity_type='difference', name='euclidean'):
+    def __init__(self, region, raw_image=None, metric='educlidean', name='similarity_criteria', mask_image=None,
+                 prior_image=None):
         """
         Parameters
         -----------------------------------------------------
         region:The region growing.
         raw_image: The raw image.
-        similarity_type:'size', 'intensity', 'homogeneity ' or 'deference'. Default is 'difference'.
         metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        name: the name of the SimilarityCriteria, default is 'similarity_criteria'.
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
         if not isinstance(region, np.ndarray):
             raise ValueError("The input region  must be ndarray type. ")
@@ -190,154 +190,206 @@ class SimilarityCriteria:
         if not isinstance(name, str):
             raise ValueError("The value of name must be str type. ")
 
-    def set_type(self, similarity_type):
-        """
-        Set the type of the distances which to use.
-        """
-        self.similarity_type = similarity_type
-
-    def get_type(self):
-        """
-        Get the type the distance used in the region growing.
-        """
-        return self.similarity_type
-
-    def set_name(self, name):
-        """
-        Set the name of the distances which to use.
-        """
+        self.region = region
+        self.raw_image = raw_image
+        self.metric = metric
         self.name = name
+        self.mask_image = mask_image
+        self.prior_image = prior_image
 
-    def get_name(self):
+    def compute(self):
         """
-        Get the name the distance used in the region growing.
+        Compute the  similarity.
         """
-        return self.name
-
-    def generating(self, region, raw_image):
-        """
-        Set the similarity metric.
-        """
-        from scipy.spatial.distance import pdist
-
-        self.metric = pdist(self, region.flatten(), raw_image.flatten())
+        return self.computing()
 
 
-class StopCriteria:
+class HomogeneitySimilarity(SimilarityCriteria):
     """
-    Stop criteria.
+    Homogeneity similarity.
     """
-    def __init__(self, region, stop_type='difference', value=None, mask_image=None):
+    def __init__(self, region, raw_image=None, metric='standard_deviation', name='homogeneity_similarity', mask_image=None,
+                 prior_image=None):
         """
         Parameters
         -----------------------------------------------------
         region:The region growing.
         raw_image: The raw image.
-        stop_type: 'size' , 'intensity', 'homogeneity' or 'deference'. Default is 'difference'.
-        value: fixed value, it should be none when mode is equal to 'adaptive'.
+        metric: 'standard_deviation', 'kendell_cc', 'mean_cross_correlation', default is 'standard_deviation'.
+        name: default is 'homogeneity_similarity'
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        if not isinstance(region, np.ndarray):
-            raise ValueError("The input region  must be ndarray type. ")
+        SimilarityCriteria.__init__(self, region, raw_image, metric, name, mask_image, prior_image)
 
-        if not isinstance(stop_type, str):
-            raise ValueError("The name must be str type. ")
-        elif stop_type is not 'size' and stop_type is not 'homogeneity' and \
-              stop_type is not 'intensity' and stop_type is not 'difference':
-            raise ValueError("The name must be 'size' or 'homogeneity'.")
+    def computing(self):
+        """
+        Compute the homogeneity similarity.
+        """
+        if self.metric is 'standard_deviation':
+            pass
+        elif self.metric is 'kendell_cc':
+            pass
+        elif self.metric is 'mean_cross_correlation':
+            pass
         else:
-            self.set_type(stop_type)
+            return None
 
-        if not isinstance(value, float) and not isinstance(value, int):
-            raise ValueError("The value must be float or int type.")
+
+class MorphologySimilarity(SimilarityCriteria):
+    """
+    Morphology similarity.
+    """
+    def __init__(self, region, raw_image=None, metric='size', name='morphology_similarity', mask_image=None,
+                 prior_image=None):
+        """
+        Parameters
+        -----------------------------------------------------
+        region:The region growing.
+        raw_image: The raw image.
+        metric: 'size', 'volume', 'shape', default is 'size'.
+        name: default is 'morphology_similarity'
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
+        """
+        SimilarityCriteria.__init__(self, region, raw_image, metric, name, mask_image, prior_image)
+
+    def computing(self):
+        """
+        Compute the morphology similarity.
+        """
+        if self.metric is 'size':
+            pass
+        elif self.metric is 'volume':
+            pass
+        elif self.metric is 'shape':
+            pass
         else:
-            self.set_value(value)
+            return None
 
-    def set_type(self, stop_type):
-        """
-        Set the name of the stop criteria.
-        """
-        self.stop_type = stop_type
 
-    def get_type(self):
+class NeighborSimilarity(SimilarityCriteria):
+    """
+    Distance measure.
+    """
+    def __init__(self, region, raw_image=None, metric='size', name='neighbor_similarity', mask_image=None,
+                 prior_image=None):
         """
-        Get the name of the stop criteria.
+        Parameters
+        -----------------------------------------------------
+        region:The region growing.
+        raw_image: The raw image.
+        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        name: the name of the SimilarityCriteria, default is 'similarity_criteria'.
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        return self.stop_type
+        SimilarityCriteria.__init__(self, region, raw_image, metric, name, mask_image, prior_image)
 
-    def set_value(self, value):
+    def computing(self):
         """
-        Set the value of the stop criteria.
+        Compute the neighbor similarity.
         """
-        self.value = value
+        if self.metric is 'educlidean':
+            pass
+        elif self.metric is 'mahalanobis':
+            pass
+        elif self.metric is 'minkowski':
+            pass
+        elif self.metric is 'seuclidean':
+            pass
+        elif self.metric is 'cityblock':
+            pass
+        else:
+            return None
 
-    def get_value(self):
+class StopCriteria(object):
+    """
+    Stop criteria.
+    """
+    def __init__(self, name='region_homogeneity', threshold=None):
         """
-        Get the value of the stop criteria.
+        Parameters
+        -----------------------------------------------------
+        name:'region_homogeneity','region_morphology','region_difference', default is 'region_difference'
+        threshold: a int value or None, default is None which means the adaptive method will be used.
         """
-        return self.value
+        if not isinstance(name, str):
+            raise ValueError("The name of the stop criteria should be str type.")
 
-    def generating(self, region, raw_image):
+        if not isinstance(threshold, int) and threshold is None:
+            raise ValueError("The threshold of the stop criteria should be int type or None.")
+
+    def computing(self):
         """
         Set the similarity metric.
         """
-        return self.generating(region, raw_image)
+        #Do something here.
+        pass
+
+
+class Region(object):
+    """
+    Distance measure.
+    """
+    def __init__(self, seed, cur_region):
+        """
+        Parameters
+        -----------------------------------------------------
+        seed: the seed to generate a region, which should be ndarray type.
+        cur_region: the current region.
+        """
+        if not isinstance(seed, np.ndarray):
+            raise ValueError("The seed of the Region class  must be ndarray type. ")
+        else:
+            self.seed = seed
+
+        if not isinstance(cur_region, np.ndarray):
+            raise ValueError("The current region of the Region class must be ndarray type. ")
+        else:
+            self.cur_region = cur_region
+
+    def compute_IB(self):
+        """
+        Compute the inner boundary
+        """
+        #Do something here.
+        pass
+
+    def compute_EB(self):
+        """
+        Compute the external boundary
+        """
+        #Do something here.
+        pass
 
 
 class RegionOptimizer:
     """
     Region optimizer.
     """
-    def __init__(self, region_sequence, raw_image, name, optimizing, optpara=None):
+    def __init__(self, raw_image, name, mask_image=None, prior_image=None):
         """
         Parameters
         -----------------------------------------------------
-        region_sequence: A series of regions.
-        raw_image: Raw image.
-        name:The name of the region optimizer method.
-        optimizing:
-        optpara: Default is None.Optional parameter
+        raw_image: raw image.
+        name: the name of the optimizer.
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        if not isinstance(region_sequence, np.ndarray):
+        if not isinstance(raw_image, np.ndarray):
             raise ValueError("The input region sequence  must be ndarray type. ")
 
-        if not isinstance(raw_image, np.ndarray):
-            raise ValueError("The input raw image  must be np.ndarray type. ")
-
-    def set_name(self, name):
-        """
-        Set the name of the region optimizer.
-        """
+        self.raw_image = raw_image
         self.name = name
+        self.mask_image = mask_image
+        self.prior_image = prior_image
 
-    def get_name(self):
+    def optimize(self):
         """
-        Get the name of the  region optimizer.
+        Get the optimize region.
         """
-        return self.name
-
-    def set_optimizing(self, optimizing):
-        """
-        Set the optimizing of the  region optimizer.
-        """
-        self.optimizing = optimizing
-
-    def get_optimizing(self):
-        """
-        Get the optimizing of the  region optimizer.
-        """
-        return self.optimizing
-
-    def set_optpara(self, optpara):
-        """
-        Set the optional parameter of the  region optimizer.
-        """
-        self.optpara = optpara
-
-    def get_optpara(self):
-        """
-        Get the optional parameter of the  region optimizer.
-        """
-        return self.optpara
+        return self.optimize()
 
 
 class Aggregator:
