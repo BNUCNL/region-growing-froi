@@ -30,6 +30,7 @@ class C(A, B):
         print 'Class C'
 
     def fun(self):
+
         print "C's fun."
 
 if __name__ == "__main__":

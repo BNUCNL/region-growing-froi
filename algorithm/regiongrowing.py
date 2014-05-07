@@ -4,6 +4,7 @@ from connectivity import compute_offsets
 from utils import inside
 import random
 
+
 class SeededRegionGrowing:
     """
     Seeded region growing with a fixed threshold.
@@ -32,7 +33,8 @@ class SeededRegionGrowing:
 
         self.target_image = target_image
         self.set_seeds(seeds)
-        self.set_stop_criteria(stop_type, value)
+        self.set_stop_criteria(StopCriteria(stop_type, value))
+        self.set_similarity_criteria(SimilarityCriteria(stop_type, similarity_criteria))
         self.set_connectivity(connectivity)
 
     def set_seeds(self, seeds):
@@ -41,11 +43,11 @@ class SeededRegionGrowing:
     def get_seeds(self):
         return self.seeds
 
-    def set_stop_criteria(self, region, stop_type, stop_criteria):
+    def set_stop_criteria(self, region, stop_criteria):
         """
         Set the stop criteria.
         """
-        self.stop_criteria = StopCriteria(region, stop_type, stop_criteria)
+        self.stop_criteria = stop_criteria
 
     def get_stop_criteria(self):
         """
@@ -116,24 +118,22 @@ class SeededRegionGrowing:
             neighbor_pos -= 1
         return self.inner_image
 
+
 class Seeds:
     """
     Seeds.
     """
-    def __init__(self, seeds):
+    def __init__(self, coords):
         """
         Init seeds.
         Parameters
         -----------------------------------------------------
         seeds: a set of coordinates or a region mask
         """
-        if not isinstance(seeds, np.ndarray):
-            if  isinstance(seeds, nib.nifti1.Nifti1Image) or isinstance(seeds, list):
-                self.generating(seeds)
-            else:
-                raise ValueError("The value must be  a 1D/2D/3D ndarray or Nifti1Image format file.!")
+        if not isinstance(coords, np.ndarray):
+            raise ValueError("The value must be  a 1D/2D/3D!")
         else:
-            self.generating(seeds)
+            self.coords = coords
 
     def generating(self):
         """
@@ -154,8 +154,8 @@ class RandomSeeds(Seeds):
         seeds_type: 'separation', 'union', 'random'
         value: a set of coordinates or a region mask.
         """
-        Seeds.__init__(seeds)
-        self.seeds = seeds
+        Seeds.__init__(self, seeds)
+
         if not isinstance(random_number, int):
             raise ValueError("The random_number must be int type.")
         else:
@@ -166,9 +166,9 @@ class RandomSeeds(Seeds):
         Generating new seeds.
         """
         if self.random_number == 0:
-            return self.seeds
+            return self.seeds.coords
         else:
-            return random.sample(self.seeds, self.random_number)
+            return random.sample(self.seeds.coords, self.random_number)
 
 
 class SimilarityCriteria:
@@ -352,9 +352,6 @@ class Aggregator:
         raw_image: raw image.
         aggregator_type: 'average', 'magnitude', 'homogeneity', default is 'average'.
         """
-        if not isinstance(seeds, list):
-            raise ValueError("The input seeds  must be list type. ")
-
         if not isinstance(region_sequence, np.ndarray):
             raise ValueError("The input region sequence  must be ndarray type. ")
 
@@ -627,11 +624,11 @@ class Peripheral_contrast:
         """
         inner_b = []
         for i in inner_region_cor:
-            if self.is_neiflag(flag_image,i,1):
-                if inner_b == [ ]:
+            if self.is_neiflag(flag_image, i, 1):
+                if inner_b == []:
                     inner_b = i
                 else:
-                    inner_b= np.vstack((inner_b,i))
+                    inner_b= np.vstack((inner_b, i))
         return np.array(inner_b)
 
     def set_stop_criteria(self, image, seed, Num):
@@ -657,10 +654,10 @@ class Peripheral_contrast:
 
         while region_size <= Num:
             inner_pos = inner_pos + 1
-            inner_list[inner_pos] = [x,y,z,image[x,y,z]]
+            inner_list[inner_pos] = [x, y, z,image[x, y, z]]
             for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
-                xn,yn,zn = x+set0,y+set1,z+set2
+                set0,set1,set2 = compute_offsets(3, 26)[i]
+                xn,yn,zn = x + set0,y + set1,z + set2
                 if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
                     outer_pos = outer_pos+1
                     outer_boundary_list[outer_pos] = [xn,yn,zn,image[xn,yn,zn]]
@@ -713,26 +710,7 @@ class Peripheral_contrast:
         return self.grow(image, seed, N)
 
 
-if __name__ == "__main__":
-    t_image = nib.load('../data/S2/tstat1.nii.gz')
-    data = t_image.get_data()
-    A = Average_contrast(data, (26,38,25), 1000)
-    new_image = A._grow(data, (26,38,25), 1000)
-    t_image._data = new_image
-    nib.save(t_image,'ACB_S2_image.nii.gz')
-    print 'average contrast growing has been saved.'
 
-    #B = Peripheral_contrast(data, (26,38,25), 1000)
-    #new_image = B._grow(data, (26,38,25), 1000)
-    #t_image._data = new_image
-    #nib.save(t_image,'PCB_S2_image')
-    #print 'peripheral contrast growing has been saved.'
-
-    #C = fixed_region_grow(data,(26,38,25),200)
-    #new_image = C._grow(data,(26,38,25),200)
-    #t_image._data = new_image
-    #nib.save(t_image,'fixed_thres_S2_image.nii.gz')
-    #print 'fixed threshold growing has been saved.'
 
 
 
