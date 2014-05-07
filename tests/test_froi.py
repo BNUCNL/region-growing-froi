@@ -1,7 +1,7 @@
 
 import nibabel as nib
 import matplotlib.pyplot as plt
-import region_grow_froi as rgf
+import regiongrowfroi as rgf
 import numpy as np
 
 
