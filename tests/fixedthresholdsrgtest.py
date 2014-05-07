@@ -2,7 +2,7 @@ __author__ = 'zgf'
 import os
 import numpy as np
 import nibabel as nib
-from algorithm.region_growing import SeededRegionGrowing
+from algorithm.regiongrowing import SeededRegionGrowing
 
 SUBJECT_FILE_PATH = "../data/S1/tstat1.nii.gz"
 
@@ -12,7 +12,7 @@ if __name__ == "__main__":
     affine = img.get_affine()
     target_image = img.get_data()
     seed = [(25, 41, 25)]
-    fixed_threshold_srg = SeedThresholdSRG(target_image, seed, stop_type='size', value=500, connectivity='6')
+    fixed_threshold_srg = SeededRegionGrowing(target_image, seed, stop_type='size', value=500, connectivity='6')
     output = fixed_threshold_srg.grow()
     nib.save(nib.Nifti1Image(output, affine), "../tests/SeededRegionGrowing.nii.gz")
     print '--------------------------END-------------------------'

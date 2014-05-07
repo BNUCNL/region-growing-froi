@@ -1,9 +1,120 @@
 import numpy as np
 import nibabel as nib
-from utils import compute_offsets
+from connectivity import compute_offsets
 from utils import inside
 import random
 
+class SeededRegionGrowing:
+    """
+    Seeded region growing with a fixed threshold.
+    """
+    def __init__(self, target_image, seeds, stop_type, value=None, connectivity='8', similarity_criteria='euclidean', mask_image=None):
+        """
+        Parameters
+        -----------------------------------------------------
+        target_image: input image, a 2D/3D Nifti1Image format file
+        seeds: a set of coordinates or a region mask
+        value the stop threshold.
+        """
+        if isinstance(target_image, nib.nifti1.Nifti1Image):
+            target_image = target_image.get_data()
+            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
+                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
+        elif isinstance(target_image, np.ndarray):
+            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
+                raise ValueError("Target image must be a 2D/3D data.")
+
+        elif isinstance(mask_image, np.ndarray):
+            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
+                raise ValueError("Mask image must be a 2D/3D data.")
+        else:
+            raise ValueError("Must be a nifti1.Nifti1Image data format..")
+
+        self.target_image = target_image
+        self.set_seeds(seeds)
+        self.set_stop_criteria(stop_type, value)
+        self.set_connectivity(connectivity)
+
+    def set_seeds(self, seeds):
+        self.seeds = seeds
+
+    def get_seeds(self):
+        return self.seeds
+
+    def set_stop_criteria(self, region, stop_type, stop_criteria):
+        """
+        Set the stop criteria.
+        """
+        self.stop_criteria = StopCriteria(region, stop_type, stop_criteria)
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def set_connectivity(self, connectivity='6'):
+        """
+        Set the connectivity.
+        """
+        self.connectivity = compute_offsets(len(self.target_image.shape), int(connectivity))
+
+    def get_connectivity(self):
+        """
+        Get the connectivity.
+        """
+        return self.connectivity
+
+    def set_similarity_criteria(self, similarity_criteria):
+        """
+        Set the similarity criteria.
+        """
+        self.set_similarity_criteria(similarity_criteria)
+
+    def get_similarity_criteria(self):
+        """
+        Get the similarity criteria.
+        """
+        return self.get_similarity_criteria()
+
+    def growing(self):
+        """
+        Fixed threshold region growing.
+        """
+        seeds = self.get_seeds()[0]
+        image_shape = self.target_image.shape
+
+        if not inside(np.array(seeds), image_shape):
+            raise ValueError("The seed is out of the image range.")
+
+        region_size = 1
+        origin_t = self.target_image[tuple(seeds)]
+        tmp_image = np.zeros_like(self.target_image)
+        self.inner_image = np.zeros_like(self.target_image)
+
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free, len(image_shape) + 1))
+
+        while region_size <= self.stop_criteria.get_value():
+            for i in range(0, self.get_connectivity().shape[1]):
+                seedn = (np.array(seeds) + self.get_connectivity()[i]).tolist()
+                if inside(seedn, image_shape) and tmp_image[tuple(seedn)] == 0:
+                    neighbor_pos = neighbor_pos + 1
+                    neighbor_list[neighbor_pos][0:len(image_shape)] = seedn
+                    neighbor_list[neighbor_pos][len(image_shape)-1] = self.target_image[tuple(seedn)]
+                    tmp_image[tuple(seedn)] = 1
+
+            tmp_image[tuple(seeds)] = 2
+            self.inner_image[tuple(seeds)] = self.target_image[tuple(seeds)]
+            region_size += 1
+
+            distance = np.abs(neighbor_list[:neighbor_pos + 1, len(image_shape)] - np.tile(origin_t, neighbor_pos + 1))
+            index = distance.argmin()
+            seed = neighbor_list[index][:len(image_shape)]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+        return self.inner_image
 
 class Seeds:
     """
@@ -64,7 +175,7 @@ class SimilarityCriteria:
     """
     Distance measure.
     """
-    def __init__(self, region, raw_image, similarity_type='difference', name='euclidean'):
+    def __init__(self, region, similarity_type='difference', name='euclidean'):
         """
         Parameters
         -----------------------------------------------------
@@ -75,9 +186,6 @@ class SimilarityCriteria:
         """
         if not isinstance(region, np.ndarray):
             raise ValueError("The input region  must be ndarray type. ")
-
-        if not isinstance(raw_image, np.ndarray):
-            raise ValueError("The input raw_image  must be ndarray type. ")
 
         if not isinstance(name, str):
             raise ValueError("The value of name must be str type. ")
@@ -119,7 +227,7 @@ class StopCriteria:
     """
     Stop criteria.
     """
-    def __init__(self, region, raw_image=None, stop_type='difference', value=None, mask_image=None):
+    def __init__(self, region, stop_type='difference', value=None, mask_image=None):
         """
         Parameters
         -----------------------------------------------------
@@ -130,9 +238,6 @@ class StopCriteria:
         """
         if not isinstance(region, np.ndarray):
             raise ValueError("The input region  must be ndarray type. ")
-
-        if not isinstance(raw_image, np.ndarray):
-            raise ValueError("The input raw_image  must be ndarray type. ")
 
         if not isinstance(stop_type, str):
             raise ValueError("The name must be str type. ")
@@ -233,119 +338,6 @@ class RegionOptimizer:
         Get the optional parameter of the  region optimizer.
         """
         return self.optpara
-
-
-class SeededRegionGrowing:
-    """
-    Seeded region growing with a fixed threshold.
-    """
-    def __init__(self, target_image, seeds, stop_type, value=None, connectivity='8', similarity_criteria='euclidean', mask_image=None):
-        """
-        Parameters
-        -----------------------------------------------------
-        target_image: input image, a 2D/3D Nifti1Image format file
-        seeds: a set of coordinates or a region mask
-        value the stop threshold.
-        """
-        if isinstance(target_image, nib.nifti1.Nifti1Image):
-            target_image = target_image.get_data()
-            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
-        elif isinstance(target_image, np.ndarray):
-            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D data.")
-
-        elif isinstance(mask_image, np.ndarray):
-            if len(target_image.shape) > 3 or len(target_image.shape) < 2:
-                raise ValueError("Mask image must be a 2D/3D data.")
-        else:
-            raise ValueError("Must be a nifti1.Nifti1Image data format..")
-
-        self.target_image = target_image
-        self.set_seeds(seeds)
-        self.set_stop_criteria(stop_type, value)
-        self.set_connectivity(connectivity)
-
-    def set_seeds(self, seeds):
-        self.seeds = seeds
-
-    def get_seeds(self):
-        return self.seeds
-
-    def set_stop_criteria(self, region, stop_type, stop_criteria):
-        """
-        Set the stop criteria.
-        """
-        self.stop_criteria = StopCriteria(region, stop_type, stop_criteria)
-
-    def get_stop_criteria(self):
-        """
-        Return the stop criteria.
-        """
-        return self.stop_criteria
-
-    def set_connectivity(self, connectivity='6'):
-        """
-        Set the connectivity.
-        """
-        self.connectivity = compute_offsets(len(self.target_image.shape), int(connectivity))
-
-    def get_connectivity(self):
-        """
-        Get the connectivity.
-        """
-        return self.connectivity
-
-    def set_similarity_criteria(self, similarity_criteria):
-        """
-        Set the similarity criteria.
-        """
-        self.set_similarity_criteria(similarity_criteria)
-
-    def get_similarity_criteria(self):
-        """
-        Get the similarity criteria.
-        """
-        return self.get_similarity_criteria()
-
-    def grow(self):
-        """
-        Fixed threshold region growing.
-        """
-        seeds = self.get_seeds()[0]
-        image_shape = self.target_image.shape
-
-        if not inside(np.array(seeds), image_shape):
-            raise ValueError("The seed is out of the image range.")
-
-        region_size = 1
-        origin_t = self.target_image[tuple(seeds)]
-        tmp_image = np.zeros_like(self.target_image)
-        self.inner_image = np.zeros_like(self.target_image)
-
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free, len(image_shape) + 1))
-
-        while region_size <= self.stop_criteria.get_value():
-            for i in range(0, self.get_connectivity().shape[1]):
-                seedn = (np.array(seeds) + self.get_connectivity()[i]).tolist()
-                if inside(seedn, image_shape) and tmp_image[tuple(seedn)] == 0:
-                    neighbor_pos = neighbor_pos + 1
-                    neighbor_list[neighbor_pos][0:len(image_shape)] = seedn
-                    neighbor_list[neighbor_pos][len(image_shape)-1] = self.target_image[tuple(seedn)]
-                    tmp_image[tuple(seedn)] = 1
-
-            tmp_image[tuple(seeds)] = 2
-            self.inner_image[tuple(seeds)] = self.target_image[tuple(seeds)]
-            region_size += 1
-
-            distance = np.abs(neighbor_list[:neighbor_pos + 1, len(image_shape)] - np.tile(origin_t, neighbor_pos + 1))
-            index = distance.argmin()
-            seed = neighbor_list[index][:len(image_shape)]
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
-        return self.inner_image
 
 
 class Aggregator:
