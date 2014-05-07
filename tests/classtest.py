@@ -1,5 +1,5 @@
 
-class A(object):
+class A:
     def __init__(self):
         """
         Init class A.
@@ -9,16 +9,19 @@ class A(object):
     def fun(self):
         print "A's fun."
 
-class B(object):
+
+class B:
     def __init__(self):
         """
         Init class B.
         """
         print 'Class B.'
+        self.member_b = 'B member.'
 
     def _fun(self):
         print "B's fun."
         self.fun()
+
 
 class C(A, B):
     def __init__(self):
@@ -28,11 +31,21 @@ class C(A, B):
         A.__init__(self)
         B.__init__(self)
         print 'Class C'
+        self.member_c = 'C member.'
+
+class D(B):
+    def __init__(self):
+        """
+        Init class D.
+        """
+        print 'Class D.'
 
     def fun(self):
 
-        print "C's fun."
+        print "D's fun."
 
 if __name__ == "__main__":
     c = C()
     c._fun()
+    d = D()
+    print C(d).member_c
