@@ -172,34 +172,38 @@ class SimilarityCriteria:
     """
     Similarity criteria..
     """
-    def __init__(self, region, raw_image=None, metric='educlidean', name='similarity_criteria', mask_image=None,
-                 prior_image=None):
+    def __init__(self, metric='educlidean'):
         """
+        Parameters
+        -----------------------------------------------------
+        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        """
+        if not isinstance(metric, str):
+            raise ValueError("The value of metric must be str type. ")
+
+        self.metric = metric
+
+    def set_metric(self, metric):
+        """
+        Get the metric of the  similarity...
+        """
+        self.metric = metric
+
+    def get_metric(self):
+        """
+        Get the metric of the  similarity...
+        """
+        return self.metric
+
+    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
+        """
+        Compute the  similarity.
         Parameters
         -----------------------------------------------------
         region:The region growing.
         raw_image: The raw image.
-        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
-        name: the name of the SimilarityCriteria, default is 'similarity_criteria'.
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        if not isinstance(region, np.ndarray):
-            raise ValueError("The input region  must be ndarray type. ")
-
-        if not isinstance(name, str):
-            raise ValueError("The value of name must be str type. ")
-
-        self.region = region
-        self.raw_image = raw_image
-        self.metric = metric
-        self.name = name
-        self.mask_image = mask_image
-        self.prior_image = prior_image
-
-    def compute(self):
-        """
-        Compute the  similarity.
         """
         return self.computing()
 
@@ -208,23 +212,35 @@ class HomogeneitySimilarity(SimilarityCriteria):
     """
     Homogeneity similarity.
     """
-    def __init__(self, region, raw_image=None, metric='standard_deviation', name='homogeneity_similarity', mask_image=None,
-                 prior_image=None):
+    def __init__(self, metric='standard_deviation'):
         """
+        Parameters
+        -----------------------------------------------------
+        metric: 'standard_deviation', 'kendell_cc', 'mean_cross_correlation', default is 'standard_deviation'.
+        """
+        SimilarityCriteria.__init__(self, metric)
+
+    def set_metric(self, metric):
+        """
+        Set the metric of the homogeneity similarity...
+        """
+        self.metric = metric
+
+    def get_metric(self):
+        """
+        Get the metric of the homogeneity similarity...
+        """
+        return self.metric
+
+    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
+        """
+        Compute the homogeneity similarity.
         Parameters
         -----------------------------------------------------
         region:The region growing.
         raw_image: The raw image.
-        metric: 'standard_deviation', 'kendell_cc', 'mean_cross_correlation', default is 'standard_deviation'.
-        name: default is 'homogeneity_similarity'
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        SimilarityCriteria.__init__(self, region, raw_image, metric, name, mask_image, prior_image)
-
-    def computing(self):
-        """
-        Compute the homogeneity similarity.
         """
         if self.metric is 'standard_deviation':
             pass
@@ -240,23 +256,35 @@ class MorphologySimilarity(SimilarityCriteria):
     """
     Morphology similarity.
     """
-    def __init__(self, region, raw_image=None, metric='size', name='morphology_similarity', mask_image=None,
-                 prior_image=None):
+    def __init__(self, metric='size'):
         """
+        Parameters
+        -----------------------------------------------------
+        metric: 'size', 'volume', 'shape', default is 'size'
+        """
+        SimilarityCriteria.__init__(self, metric)
+
+    def set_metric(self, metric):
+        """
+        Set the metric of the morphology similarity...
+        """
+        self.metric = metric
+
+    def get_metric(self):
+        """
+        Get the metric of the morphology similarity...
+        """
+        return self.metric
+
+    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
+        """
+        Compute the morphology similarity.
         Parameters
         -----------------------------------------------------
         region:The region growing.
         raw_image: The raw image.
-        metric: 'size', 'volume', 'shape', default is 'size'.
-        name: default is 'morphology_similarity'
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        SimilarityCriteria.__init__(self, region, raw_image, metric, name, mask_image, prior_image)
-
-    def computing(self):
-        """
-        Compute the morphology similarity.
         """
         if self.metric is 'size':
             pass
@@ -270,25 +298,37 @@ class MorphologySimilarity(SimilarityCriteria):
 
 class NeighborSimilarity(SimilarityCriteria):
     """
-    Distance measure.
+    Neighbor similarity.
     """
-    def __init__(self, region, raw_image=None, metric='size', name='neighbor_similarity', mask_image=None,
-                 prior_image=None):
+    def __init__(self, metric='size'):
         """
+        Parameters
+        -----------------------------------------------------
+        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        """
+        SimilarityCriteria.__init__(self, metric)
+
+    def set_metric(self, metric):
+        """
+        Set the metric of the neighbor similarity...
+        """
+        self.metric = metric
+
+    def get_metric(self):
+        """
+        Get the metric of the neighbor similarity...
+        """
+        return self.metric
+
+    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
+        """
+        Compute the neighbor similarity.
         Parameters
         -----------------------------------------------------
         region:The region growing.
         raw_image: The raw image.
-        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
-        name: the name of the SimilarityCriteria, default is 'similarity_criteria'.
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        SimilarityCriteria.__init__(self, region, raw_image, metric, name, mask_image, prior_image)
-
-    def computing(self):
-        """
-        Compute the neighbor similarity.
         """
         if self.metric is 'educlidean':
             pass
@@ -320,6 +360,19 @@ class StopCriteria(object):
         if not isinstance(threshold, int) and threshold is None:
             raise ValueError("The threshold of the stop criteria should be int type or None.")
 
+    def set_name(self, name):
+        """
+        Get the name of the stop criteria..
+        """
+        self.metric = name
+
+    def get_name(self):
+        """
+        Get the name of the stop criteria..
+        """
+        return self.name
+
+
     def computing(self):
         """
         Set the similarity metric.
@@ -348,6 +401,12 @@ class Region(object):
             raise ValueError("The current region of the Region class must be ndarray type. ")
         else:
             self.cur_region = cur_region
+
+    def get_neighbor(self):
+        """
+        Get the neighbor.
+        """
+        return self.neighbor
 
     def compute_IB(self):
         """
