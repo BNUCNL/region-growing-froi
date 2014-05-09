@@ -755,7 +755,7 @@ class AverageContrast:
         return inner_image
 
 
-class Peripheral_contrast:
+class PeripheralContrast:
     """
     Max peripheral contrast region growing.
     """
