@@ -474,13 +474,13 @@ class AdaptiveSRG(SeededRegionGrowing):
     """
     Adaptive seeded region growing.
     """
-    def __init__(self, target_image, seed, Thres, connectivity):
+    def __init__(self, target_image, seed, upperlimit, connectivity):
         if not isinstance(seed, np.ndarray):
             seed = np.array(seed)
         self.target_image = target_image
         self.set_seeds(seed)
         self.get_seeds()
-        self.git_thres = Thres
+        self.get_uplimit = upperlimit
         self.set_connectivity(connectivity)
         self.get_connectivity()
 
@@ -549,7 +549,7 @@ class AdaptiveSRG(SeededRegionGrowing):
         Adaptive region growing.
         """
         region_list = []
-        for i in range(20,1000,20):
+        for i in range(20,self.get_uplimit,20):
             region_list[i/20-1] = SeededRegionGrowing.grow()
         return region_list
 
@@ -559,35 +559,47 @@ class AdaptiveSRG(SeededRegionGrowing):
         if opt_measurement != 'average' and opt_measurement != 'peripheral':
             raise ValueError("The optimize measurement must be average or peripheral contrast.")
         elif opt_measurement == 'average':
-            for i in range(20,1000,20):
+            for i in range(20,self.get_uplimit,20):
                 contrast[i/20-1] = self.average_contrast()[i]
             k = np.array(contrast).argmax()
             return region_list[k]
         else:
-            for i in range(20,1000,20):
+            for i in range(20,self.get_uplimit,20):
                 contrast[i/20-1] = self.peripheral_contrast()[i]
             k = np.array(contrast).argmax()
             return region_list[k]
 
 
-class Average_contrast:
+class AverageContrast:
     """
     Max average contrast region growing.
     """
-    def __init__(self, target_image, seed, Thres):
-        if not isinstance(seed,np.ndarray):
-            seed = np.array(seed)
+    def __init__(self, target_image, seeds, thres):
+        if not isinstance(seeds, np.ndarray):
+            seed = np.array(seeds)
+        self.thres = thres
         self.target_image = target_image
-        self.set_seed(seed)
-        self.set_stop_criteria(target_image, seed, Thres)
+        self.set_seeds(seeds)
 
-    def set_stop_criteria(self, image, seed, Num):
+    def set_seeds(self, seeds):
+        """
+        Set the seeds.
+        """
+        self.seeds = seeds
+
+    def get_seeds(self):
+        """
+        Get the seeds.
+        """
+        return self.seeds
+
+    def set_stop_criteria(self, image, seeds, Num):
         """
         set stop criteria according to the max average contrast point.
         """
-        x,y,z = seed
+        x,y,z = seeds
         image_shape = image.shape
-        if inside(seed,image_shape)!=True:
+        if inside(seeds,image_shape)!=True:
             print "The seed is out of the image range."
             return False
 
@@ -630,7 +642,7 @@ class Average_contrast:
             neighbor_pos -= 1
         number = int(np.array(contrast).argmax()+1)
         print number
-        self.stop_criteria = StopCriteria('size', 'fixed', number)
+        self.stop_criteria = StopCriteria('region_homogeneity', number)
 
     def get_stop_criteria(self):
         """
@@ -638,25 +650,62 @@ class Average_contrast:
         """
         return self.stop_criteria
 
-    def _grow(self, image, seed, Num):
+    def grow(self):
         """
-        Average contrast growing.
+        Give a coordinate ,return a region.
         """
-        self.set_stop_criteria(image, seed, Num)
-        N = self.get_stop_criteria().value
-        return self.grow(image, seed, N)
+        seeds = self.get_seeds()
+        image = self.target_image
+        x,y,z = seeds
+        image_shape = image.shape
+
+        if inside(seeds,image_shape)!=True:
+            print "The seed is out of the image range."
+            return False
+
+        region_size = 1
+        origin_t = image[x,y,z]
+
+        Num = self.set_stop_criteria(image, seeds, self.thres)
+        tmp_image = np.zeros_like(image)
+        inner_image = np.zeros_like(image)
+
+        neighbor_free = 10000
+        neighbor_pos = -1
+        neighbor_list = np.zeros((neighbor_free,4))
+
+        while region_size <= Num:
+            for i in range(26):
+                set0,set1,set2 = compute_offsets(3,26)[i]
+                xn,yn,zn = x+set0,y+set1,z+set2
+                if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
+                    neighbor_pos = neighbor_pos+1
+                    neighbor_list[neighbor_pos] = [xn,yn,zn,image[xn,yn,zn]]
+                    tmp_image[xn,yn,zn] = 1
+
+            tmp_image[x,y,z] = 2
+            inner_image[x,y,z] = image[x,y,z]
+            region_size += 1
+
+            distance = np.abs(neighbor_list[:neighbor_pos+1,3] - np.tile(origin_t,neighbor_pos+1))
+            index = distance.argmin()
+            x,y,z = neighbor_list[index][:3]
+            neighbor_list[index] = neighbor_list[neighbor_pos]
+            neighbor_pos -= 1
+
+        return inner_image
 
 
 class Peripheral_contrast:
     """
     Max peripheral contrast region growing.
     """
-    def __init__(self, target_image, seed, Thres):
+    def __init__(self, target_image, seed, thres):
         if not isinstance(seed,np.ndarray):
             seed = np.array(seed)
         self.target_image = target_image
         self.set_seed(seed)
-        self.set_stop_criteria(target_image, seed, Thres)
+        self.set_stop_criteria(target_image, seed, thres)
 
     def is_neiflag(self,flag_image,coordinate,flag):
         """
@@ -760,9 +809,6 @@ class Peripheral_contrast:
         self.set_stop_criteria(image, seed, Num)
         N = self.get_stop_criteria().value
         return self.grow(image, seed, N)
-
-
-
 
 
 

@@ -1,13 +1,12 @@
 import numpy as np
 import nibabel as nib
-from connectivity import compute_offsets
-from algorithm.regiongrowing import Average_contrast
+from ..algorithm.regiongrowing import AverageContrast
 
 if __name__ == "__main__":
     t_image = nib.load('../data/S2/tstat1.nii.gz')
     data = t_image.get_data()
-    A = Average_contrast(data, (26,38,25), 1000)
-    new_image = A._grow(data, (26,38,25), 1000)
+    A = AverageContrast(data, (26,38,25), 1000)
+    new_image = A.grow()
     t_image._data = new_image
     nib.save(t_image,'ACB_S2_image.nii.gz')
     print 'average contrast growing has been saved.'
