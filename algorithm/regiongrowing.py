@@ -633,12 +633,14 @@ class AverageContrast:
     """
     Max average contrast region growing.
     """
-    def __init__(self, target_image, seeds, thres):
+    def __init__(self, target_image, seeds, connectivity, thres):
         if not isinstance(seeds, np.ndarray):
             seeds = np.array(seeds)
         self.thres = thres
+        self.connectivity = connectivity
         self.target_image = target_image
         self.set_seeds(seeds)
+        self.set_connectivity(connectivity)
 
     def set_seeds(self, seeds):
         """
@@ -652,7 +654,19 @@ class AverageContrast:
         """
         return self.seeds
 
-    def set_stop_criteria(self, image, seeds, Num):
+    def set_connectivity(self, connectivity):
+        """
+        Set the connectivity.
+        """
+        self.compute_con = compute_offsets(len(self.target_image.shape), int(connectivity))
+
+    def get_connectivity(self):
+        """
+        Get the connectivity.
+        """
+        return self.compute_con
+
+    def set_stop_criteria(self, image, seeds, connectivity, Num):
         """
         set stop criteria according to the max average contrast point.
         """
@@ -673,8 +687,8 @@ class AverageContrast:
         neighbor_list = np.zeros((neighbor_free,4))
 
         while region_size <= Num:
-            for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
+            for i in range(int(self.connectivity)):
+                set0,set1,set2 = self.get_connectivity()[i]
                 xn,yn,zn = x+set0,y+set1,z+set2
                 if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
                     neighbor_pos = neighbor_pos + 1
@@ -715,6 +729,7 @@ class AverageContrast:
         """
         seeds = self.get_seeds()
         image = self.target_image
+        connectivity = self.connectivity
         x,y,z = seeds
         image_shape = image.shape
 
@@ -725,7 +740,7 @@ class AverageContrast:
         region_size = 1
         origin_t = image[x,y,z]
 
-        Num = self.set_stop_criteria(image, seeds, self.thres)
+        Num = self.set_stop_criteria(image, seeds, connectivity, self.thres)
         tmp_image = np.zeros_like(image)
         inner_image = np.zeros_like(image)
 
@@ -734,8 +749,8 @@ class AverageContrast:
         neighbor_list = np.zeros((neighbor_free,4))
 
         while region_size <= Num:
-            for i in range(26):
-                set0,set1,set2 = compute_offsets(3,26)[i]
+            for i in range(self.connectivity):
+                set0,set1,set2 = self.get_connectivity()[i]
                 xn,yn,zn = x+set0,y+set1,z+set2
                 if inside((xn,yn,zn),image_shape) and tmp_image[xn,yn,zn]==0:
                     neighbor_pos = neighbor_pos+1
@@ -765,7 +780,18 @@ class PeripheralContrast:
         self.thres = thres
         self.target_image = target_image
         self.set_seeds(seeds)
-        self.set_stop_criteria(target_image, seeds, thres)
+
+    def set_seeds(self, seeds):
+        """
+        Set the seeds.
+        """
+        self.seeds = seeds
+
+    def get_seeds(self):
+        """
+        Get the seeds.
+        """
+        return self.seeds
 
     def is_neiflag(self,flag_image,coordinate,flag):
         """
@@ -906,7 +932,6 @@ class PeripheralContrast:
             neighbor_pos -= 1
 
         return inner_image
-
 
 
 
