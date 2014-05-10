@@ -9,8 +9,7 @@ class SeededRegionGrowing:
     """
     Seeded region growing with a fixed threshold.
     """
-    # def __init__(self, target_image, seeds, stop_type, value=None, connectivity='8', similarity_criteria='euclidean', mask_image=None):
-    def __init__(self, seeds, connectivity, similarity_criteria, stop_criteria, region_sequence):
+    def __init__(self, target_image, seeds, similarity_criteria, stop_criteria, connectivity, region_sequence=None):
         """
         Parameters
         -----------------------------------------------------
@@ -18,21 +17,20 @@ class SeededRegionGrowing:
         seeds: a set of coordinates or a region mask
         value the stop threshold.
         """
-        if isinstance(region_sequence, nib.nifti1.Nifti1Image):
-            target_image = region_sequence.get_data()
+        if isinstance(target_image, nib.nifti1.Nifti1Image):
+            self.target_image = target_image.get_data()
             if len(target_image.shape) > 4 or len(target_image.shape) < 2:
                 raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
-        elif isinstance(region_sequence, np.ndarray):
-            if len(region_sequence.shape) > 4 or len(region_sequence.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D data.")
-        else:
-            raise ValueError("Must be a nifti1.Nifti1Image data format..")
+        elif isinstance(target_image, np.ndarray):
+            self.target_image = target_image
+            if len(target_image.shape) > 4 or len(target_image.shape) < 2:
+                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
 
-        self.target_image = target_image
-        self.set_seeds(seeds)
-        self.set_stop_criteria(stop_criteria)
-        self.set_similarity_criteria(similarity_criteria)
-        self.set_connectivity(connectivity)
+        self.seeds = seeds
+        self.similarity_criteria = similarity_criteria
+        self.stop_criteria = stop_criteria
+        self.connectivity = connectivity
+        self.region_sequence = region_sequence
 
     def set_seeds(self, seeds):
         self.seeds = seeds
@@ -40,7 +38,7 @@ class SeededRegionGrowing:
     def get_seeds(self):
         return self.seeds
 
-    def set_stop_criteria(self, region, stop_criteria):
+    def set_stop_criteria(self, stop_criteria):
         """
         Set the stop criteria.
         """
@@ -52,11 +50,11 @@ class SeededRegionGrowing:
         """
         return self.stop_criteria
 
-    def set_connectivity(self, connectivity='6'):
+    def set_connectivity(self, connectivity):
         """
         Set the connectivity.
         """
-        self.connectivity = compute_offsets(len(self.target_image.shape), int(connectivity))
+        self.connectivity = connectivity
 
     def get_connectivity(self):
         """
@@ -76,44 +74,62 @@ class SeededRegionGrowing:
         """
         return self.get_similarity_criteria()
 
+    def set_region_sequence(self, region_sequence):
+        """
+        Set the region sequence.
+        """
+        self.region_sequence = region_sequence
+
+    def get_region_sequence(self):
+        """
+        Get the region sequence..
+        """
+        return self.region_sequence
+
     def grow(self):
         """
         Fixed threshold region growing.
         """
-        seeds = self.get_seeds()[0]
+        seed = self.seeds.coords
         image_shape = self.target_image.shape
 
-        if not inside(np.array(seeds), image_shape):
+        if not inside(np.array(seed), image_shape):
             raise ValueError("The seed is out of the image range.")
 
-        region_size = 1
-        origin_t = self.target_image[tuple(seeds)]
+        origin_t = self.target_image[tuple(seed)]
         tmp_image = np.zeros_like(self.target_image)
-        self.inner_image = np.zeros_like(self.target_image)
+        region = np.zeros_like(self.target_image)
 
         neighbor_free = 10000
         neighbor_pos = -1
         neighbor_list = np.zeros((neighbor_free, len(image_shape) + 1))
+        region_size = 1
 
-        while region_size <= self.stop_criteria.get_value():
-            for i in range(0, self.get_connectivity().shape[1]):
-                seedn = (np.array(seeds) + self.get_connectivity()[i]).tolist()
+        while region_size <= self.stop_criteria.computing():
+            for i in range(self.connectivity.get_connectivity(image_shape).shape[0]):
+                seedn = (seed + self.connectivity.get_connectivity(image_shape)[i])
                 if inside(seedn, image_shape) and tmp_image[tuple(seedn)] == 0:
-                    neighbor_pos = neighbor_pos + 1
-                    neighbor_list[neighbor_pos][0:len(image_shape)] = seedn
-                    neighbor_list[neighbor_pos][len(image_shape)-1] = self.target_image[tuple(seedn)]
+                    neighbor_pos += 1
+                    neighbor_list[neighbor_pos][:len(image_shape)] = seedn
+                    neighbor_list[neighbor_pos][len(image_shape)] = self.target_image[tuple(seedn)]
                     tmp_image[tuple(seedn)] = 1
 
-            tmp_image[tuple(seeds)] = 2
-            self.inner_image[tuple(seeds)] = self.target_image[tuple(seeds)]
-            region_size += 1
+            if (neighbor_pos + 100) > neighbor_free:
+                neighbor_free += 10000
+                new_list = np.zeros((10000, len(image_shape) + 1))
+                neighbor_list = np.vstack((neighbor_list, new_list))
 
-            distance = np.abs(neighbor_list[:neighbor_pos + 1, len(image_shape)] - np.tile(origin_t, neighbor_pos + 1))
-            index = distance.argmin()
-            seed = neighbor_list[index][:len(image_shape)]
+            tmp_image[tuple(seed)] = 2
+            region[tuple(seed)] = self.target_image[tuple(seed)]
+
+            index = self.similarity_criteria.computing(np.tile(origin_t, neighbor_pos + 1) -
+                                                       neighbor_list[:neighbor_pos + 1, len(image_shape)])
+            seed = neighbor_list[index, :len(image_shape)].copy()
             neighbor_list[index] = neighbor_list[neighbor_pos]
             neighbor_pos -= 1
-        return self.inner_image
+            region_size += 1
+
+        return region
 
 
 class Seeds:
@@ -300,7 +316,7 @@ class NeighborSimilarity(SimilarityCriteria):
     """
     Neighbor similarity.
     """
-    def __init__(self, metric='size'):
+    def __init__(self, metric='educlidean'):
         """
         Parameters
         -----------------------------------------------------
@@ -331,7 +347,9 @@ class NeighborSimilarity(SimilarityCriteria):
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
         if self.metric is 'educlidean':
-            pass
+            distance = np.abs(region)
+            index = distance.argmin()
+            return index
         elif self.metric is 'mahalanobis':
             pass
         elif self.metric is 'minkowski':
@@ -343,15 +361,16 @@ class NeighborSimilarity(SimilarityCriteria):
         else:
             return None
 
+
 class StopCriteria(object):
     """
     Stop criteria.
     """
-    def __init__(self, name='region_homogeneity', threshold=None):
+    def __init__(self, name='region_size', threshold=None):
         """
         Parameters
         -----------------------------------------------------
-        name:'region_homogeneity','region_morphology','region_difference', default is 'region_difference'
+        name:'region_homogeneity','region_morphology','region_difference', 'region_size', default is 'region_difference'
         threshold: a int value or None, default is None which means the adaptive method will be used.
         """
         if not isinstance(name, str):
@@ -359,6 +378,9 @@ class StopCriteria(object):
 
         if not isinstance(threshold, int) and threshold is None:
             raise ValueError("The threshold of the stop criteria should be int type or None.")
+
+        self.name = name
+        self.threshold = threshold
 
     def set_name(self, name):
         """
@@ -375,10 +397,43 @@ class StopCriteria(object):
 
     def computing(self):
         """
-        Set the similarity metric.
+        Set the stop criteria.
         """
-        #Do something here.
-        pass
+        return self.threshold
+
+
+class Connectivity:
+    """
+    Pixel connectivity.
+    """
+    def __init__(self, name='8'):
+        """
+        Parameters
+        -----------------------------------------------------
+        name:for 2D ndarray, the name can be '4', '8'; for 3d ndarray, the name can be '6', '18', '26', default is '8'.
+        """
+        self.name = name
+
+    def set_name(self, name):
+        """
+        Get the name of the connectivity..
+        """
+        self.name = name
+
+    def get_name(self):
+        """
+        Get the name of the connectivity..
+        """
+        return self.name
+
+    def get_connectivity(self, image_shape):
+        """
+        Get the connectivity of the connectivity..
+        Parameters
+        -----------------------------------------------------
+        target_image: The input target image.
+        """
+        return compute_offsets(len(image_shape), int(self.name))
 
 
 class Region(object):

@@ -1,5 +1,7 @@
 
 import numpy as np
+
+
 def compute_offsets(nbdim, nbsize):
     """
     compute the offsets.
@@ -36,7 +38,7 @@ def compute_offsets(nbdim, nbsize):
                                 [-1, 0, 0],
                                 [0, 1, 0],
                                 [0, -1, 0],
-                                [0, 0, -1],
+                                [0, 0, 1],
                                 [0, 0, -1]])
         elif nbsize == 18:
             offsets = np.array([[0, -1, -1],
