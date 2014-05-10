@@ -98,12 +98,14 @@ class SeededRegionGrowing:
 
         origin_t = self.target_image[tuple(seed)]
         tmp_image = np.zeros_like(self.target_image)
-        region = np.zeros_like(self.target_image)
+        region_data = np.zeros_like(self.target_image)
 
         neighbor_free = 10000
         neighbor_pos = -1
         neighbor_list = np.zeros((neighbor_free, len(image_shape) + 1))
         region_size = 1
+
+        region = Region(neighbor_list[:neighbor_pos + 1, len(image_shape)], region_data)
 
         while region_size <= self.stop_criteria.computing():
             for i in range(self.connectivity.get_connectivity(image_shape).shape[0]):
@@ -120,16 +122,15 @@ class SeededRegionGrowing:
                 neighbor_list = np.vstack((neighbor_list, new_list))
 
             tmp_image[tuple(seed)] = 2
-            region[tuple(seed)] = self.target_image[tuple(seed)]
-
-            index = self.similarity_criteria.computing(np.tile(origin_t, neighbor_pos + 1) -
-                                                       neighbor_list[:neighbor_pos + 1, len(image_shape)])
+            region.get_current_region()[tuple(seed)] = self.target_image[tuple(seed)]
+            region.set_neighbor(neighbor_list[:neighbor_pos + 1, len(image_shape)])
+            index = self.similarity_criteria.computing(region)
             seed = neighbor_list[index, :len(image_shape)].copy()
             neighbor_list[index] = neighbor_list[neighbor_pos]
             neighbor_pos -= 1
             region_size += 1
 
-        return region
+        return region.get_current_region()
 
 
 class Seeds:
@@ -347,7 +348,8 @@ class NeighborSimilarity(SimilarityCriteria):
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
         if self.metric is 'educlidean':
-            distance = np.abs(region)
+            region_mean = region.get_current_region()[region.get_current_region()!=0].mean()
+            distance = np.abs(region_mean - region.get_neighbor())
             index = distance.argmin()
             return index
         elif self.metric is 'mahalanobis':
@@ -440,28 +442,44 @@ class Region(object):
     """
     Distance measure.
     """
-    def __init__(self, seed, cur_region):
+    def __init__(self, neighbour, cur_region):
         """
         Parameters
         -----------------------------------------------------
-        seed: the seed to generate a region, which should be ndarray type.
+        neighbour: neighbour.
         cur_region: the current region.
         """
-        if not isinstance(seed, np.ndarray):
+        if not isinstance(neighbour, np.ndarray):
             raise ValueError("The seed of the Region class  must be ndarray type. ")
-        else:
-            self.seed = seed
-
         if not isinstance(cur_region, np.ndarray):
             raise ValueError("The current region of the Region class must be ndarray type. ")
-        else:
-            self.cur_region = cur_region
+
+        self.neighbour = neighbour
+        self.cur_region = cur_region
+
+    def set_neighbor(self, neighbor):
+        """
+        Get the neighbor.
+        """
+        self.neighbour = neighbor
 
     def get_neighbor(self):
         """
         Get the neighbor.
         """
-        return self.neighbor
+        return self.neighbour
+
+    def set_current_region(self, cur_region):
+        """
+        Get the neighbor.
+        """
+        self.cur_region = cur_region
+
+    def get_current_region(self):
+        """
+        Get the neighbor.
+        """
+        return self.cur_region
 
     def compute_IB(self):
         """
@@ -538,6 +556,7 @@ class Aggregator:
         Aggregation for different regions
         """
 
+
 class RandomSRG:
     """
     Seeded region growing based on random seeds.
@@ -582,6 +601,7 @@ class RandomSRG:
         raw_image = None
         self.aggregator = Aggregator(self.seeds, n_regions, raw_image)
         self.aggregator.aggregator()
+
 
 class AdaptiveSRG(SeededRegionGrowing):
 

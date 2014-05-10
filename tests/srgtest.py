@@ -31,5 +31,6 @@ if __name__ == "__main__":
     srg.target_image = target_image_2d
     output2d = srg.grow()
     nib.save(nib.Nifti1Image(output2d, affine2d), "../tests/SeededRegionGrowing2D.nii.gz")
+
     print 'SeededRegionGrowing2D.nii.gz was created.'
     print '------------------END------------------'
