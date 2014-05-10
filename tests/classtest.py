@@ -46,6 +46,5 @@ class D(B):
 
 if __name__ == "__main__":
     c = C()
-    c._fun()
-    d = D()
-    print C(d).member_c
+    ret = c._fun()
+    print ret
