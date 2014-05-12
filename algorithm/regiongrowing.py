@@ -103,45 +103,31 @@ class SeededRegionGrowing:
             self.clone_image = self.target_image
 
         tmp_image = np.zeros_like(self.clone_image)
-        region_data = np.zeros_like(self.clone_image)
+        tmp_image[tuple(seed)] = 2
 
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free, len(image_shape)))
         region_size = 1
+        region = Region()
+        region.set_current_region(tmp_image)
 
         for i in range(self.seeds.coords.shape[0]):
-            neighbor_pos += 1
-            neighbor_list[neighbor_pos] = self.seeds.coords[i]
-            tmp_image[tuple(self.seeds.coords)] = 1
-            if not inside(np.array(tuple(self.seeds.coords)), image_shape):
+            region.get_current_region()[tuple(self.seeds.coords[i])] = 1
+            if not inside(np.array(tuple(seed)), image_shape):
                 raise ValueError("The seed is out of the image range.")
 
-        region = Region(neighbor_list[:neighbor_pos + 1], region_data)
         while region_size <= self.stop_criteria.computing():
             for i in range(self.connectivity.get_connectivity(image_shape).shape[0]):
-                seedn = (seed + self.connectivity.get_connectivity(image_shape)[i])
-                if inside(seedn, image_shape) and tmp_image[tuple(seedn)] == 0:
-                    neighbor_pos += 1
-                    neighbor_list[neighbor_pos, :] = seedn
-                    tmp_image[tuple(seedn)] = 1
+                seed_neighbor = (seed + self.connectivity.get_connectivity(image_shape)[i])
+                if inside(seed_neighbor, image_shape) and tmp_image[tuple(seed_neighbor)] == 0:
+                    tmp_image[tuple(seed_neighbor)] = 1
 
-            if (neighbor_pos + 100) > neighbor_free:
-                neighbor_free += 10000
-                new_list = np.zeros((10000, len(image_shape) + 1))
-                neighbor_list = np.vstack((neighbor_list, new_list))
-
-            print 'seed: ', seed, 'index: ',index
+            print "neighbor: ", seed, '-----------',region_size
             tmp_image[tuple(seed)] = 2
-            region.get_current_region()[tuple(seed)] = self.clone[tuple(seed)]
-            region.set_neighbor(neighbor_list[:neighbor_pos + 1])
-            index = self.similarity_criteria.computing(region, self.target_image)
-            seed = neighbor_list[index].copy()
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
+            seed = self.similarity_criteria.computing(region, self.target_image)
             region_size += 1
 
-        return region.get_current_region()
+        region_data = region.get_current_region().copy()
+        region_data[region_data == 1] = 0
+        return region_data
 
 
 class Seeds:
@@ -359,17 +345,14 @@ class NeighborSimilarity(SimilarityCriteria):
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
         from scipy.spatial import distance
-
         if self.metric is 'euclidean':
-            if len(region.get_current_region().shape) == 4:
-                region_mean = np.mean(region.get_current_region()[region.get_current_region()[0] != 0], axis=0)
-                distance = distance.cdist(region_mean, region[tuple(region.get_neighbor())])
-                index = distance.argmin()
-            else:
-                region_mean = region.get_current_region()[region.get_current_region() != 0].mean()
-                distance = np.abs(region_mean - region[tuple(region.get_neighbor())])
-                index = distance.argmin()
-                print index
+            region_data = region.get_current_region()
+            region_mean = np.mean(raw_image[region_data == 2], axis=0)
+            temp_region = np.zeros_like(region_data) + 10000
+            temp_region[region_data == 1] = distance.cdist(region_mean.reshape(1, region_mean.size), raw_image[region_data == 1].reshape(
+                region_data[region_data == 1].size,  region_mean.size), self.metric)[0, :]
+            index = np.unravel_index(temp_region.argmin(), region_data.shape)
+
             return index
         elif self.metric is 'mahalanobis':
             pass
@@ -461,32 +444,21 @@ class Region(object):
     """
     Distance measure.
     """
-    def __init__(self, neighbour, cur_region):
+    def __init__(self, cur_region):
         """
         Parameters
         -----------------------------------------------------
-        neighbour: neighbour.
         cur_region: the current region.
         """
-        if not isinstance(neighbour, np.ndarray):
-            raise ValueError("The seed of the Region class  must be ndarray type. ")
         if not isinstance(cur_region, np.ndarray):
             raise ValueError("The current region of the Region class must be ndarray type. ")
 
-        self.neighbour = neighbour
         self.cur_region = cur_region
 
-    def set_neighbor(self, neighbor):
+    def __init__(self):
         """
-        Get the neighbor.
+        Default init function..
         """
-        self.neighbour = neighbor
-
-    def get_neighbor(self):
-        """
-        Get the neighbor.
-        """
-        return self.neighbour
 
     def set_current_region(self, cur_region):
         """
