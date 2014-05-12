@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     cords3d = np.array([24, 36, 25])
     seeds3d = Seeds(cords3d)
-    similarity_criteria = NeighborSimilarity(metric='educlidean',)
+    similarity_criteria = NeighborSimilarity(metric='euclidean',)
     stop_criteria = StopCriteria(name='region_size', threshold=300)
     connectivity = Connectivity('6')
 
