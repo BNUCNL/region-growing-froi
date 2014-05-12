@@ -61,6 +61,7 @@ def choose_seeds(subject_data, labels_images):
         if value.size == 0:
            seeds.append((0, 0, 0))
            valid_count = valid_count + 1
+
         else:
            seeds.append(np.unravel_index(temp.argmax(), subject_data[index, :, :, :].shape))
 

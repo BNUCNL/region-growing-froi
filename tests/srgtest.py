@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     cords3d = np.array([24, 36, 25])
     seeds3d = Seeds(cords3d)
-    similarity_criteria = NeighborSimilarity(metric='educlidean',)
+    similarity_criteria = NeighborSimilarity(metric='euclidean',)
     stop_criteria = StopCriteria(name='region_size', threshold=300)
     connectivity = Connectivity('6')
 
@@ -31,5 +31,6 @@ if __name__ == "__main__":
     srg.target_image = target_image_2d
     output2d = srg.grow()
     nib.save(nib.Nifti1Image(output2d, affine2d), "../tests/SeededRegionGrowing2D.nii.gz")
+
     print 'SeededRegionGrowing2D.nii.gz was created.'
     print '------------------END------------------'

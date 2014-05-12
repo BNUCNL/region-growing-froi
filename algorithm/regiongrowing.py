@@ -90,46 +90,44 @@ class SeededRegionGrowing:
         """
         Fixed threshold region growing.
         """
-        seed = self.seeds.coords
+        if len(self.seeds.coords.shape) == 1:
+            self.seeds.coords = np.array([self.seeds.coords])
+        seed = self.seeds.coords[0]
+        np.delete(self.seeds.coords, 0)
+
         image_shape = self.target_image.shape
+        if len(image_shape) == 4:
+            image_shape = self.target_image.shape[:3]
+            self.clone_image = self.target_image[..., 0].copy()
+        else:
+            self.clone_image = self.target_image
 
-        if not inside(np.array(seed), image_shape):
-            raise ValueError("The seed is out of the image range.")
+        tmp_image = np.zeros_like(self.clone_image)
+        tmp_image[tuple(seed)] = 2
 
-        origin_t = self.target_image[tuple(seed)]
-        tmp_image = np.zeros_like(self.target_image)
-        region = np.zeros_like(self.target_image)
-
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free, len(image_shape) + 1))
         region_size = 1
+        region = Region()
+        region.set_current_region(tmp_image)
+
+        for i in range(self.seeds.coords.shape[0]):
+            region.get_current_region()[tuple(self.seeds.coords[i])] = 1
+            if not inside(np.array(tuple(seed)), image_shape):
+                raise ValueError("The seed is out of the image range.")
 
         while region_size <= self.stop_criteria.computing():
             for i in range(self.connectivity.get_connectivity(image_shape).shape[0]):
-                seedn = (seed + self.connectivity.get_connectivity(image_shape)[i])
-                if inside(seedn, image_shape) and tmp_image[tuple(seedn)] == 0:
-                    neighbor_pos += 1
-                    neighbor_list[neighbor_pos][:len(image_shape)] = seedn
-                    neighbor_list[neighbor_pos][len(image_shape)] = self.target_image[tuple(seedn)]
-                    tmp_image[tuple(seedn)] = 1
+                seed_neighbor = (seed + self.connectivity.get_connectivity(image_shape)[i])
+                if inside(seed_neighbor, image_shape) and tmp_image[tuple(seed_neighbor)] == 0:
+                    tmp_image[tuple(seed_neighbor)] = 1
 
-            if (neighbor_pos + 100) > neighbor_free:
-                neighbor_free += 10000
-                new_list = np.zeros((10000, len(image_shape) + 1))
-                neighbor_list = np.vstack((neighbor_list, new_list))
-
+            print "neighbor: ", seed, '-----------',region_size
             tmp_image[tuple(seed)] = 2
-            region[tuple(seed)] = self.target_image[tuple(seed)]
-
-            index = self.similarity_criteria.computing(np.tile(origin_t, neighbor_pos + 1) -
-                                                       neighbor_list[:neighbor_pos + 1, len(image_shape)])
-            seed = neighbor_list[index, :len(image_shape)].copy()
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
+            seed = self.similarity_criteria.computing(region, self.target_image)
             region_size += 1
 
-        return region
+        region_data = region.get_current_region().copy()
+        region_data[region_data == 1] = 0
+        return region_data
 
 
 class Seeds:
@@ -192,7 +190,7 @@ class SimilarityCriteria:
         """
         Parameters
         -----------------------------------------------------
-        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
         """
         if not isinstance(metric, str):
             raise ValueError("The value of metric must be str type. ")
@@ -320,7 +318,7 @@ class NeighborSimilarity(SimilarityCriteria):
         """
         Parameters
         -----------------------------------------------------
-        metric: 'educlidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
         """
         SimilarityCriteria.__init__(self, metric)
 
@@ -336,7 +334,7 @@ class NeighborSimilarity(SimilarityCriteria):
         """
         return self.metric
 
-    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
+    def computing(self, region, raw_image, mask_image=None, prior_image=None):
         """
         Compute the neighbor similarity.
         Parameters
@@ -346,9 +344,15 @@ class NeighborSimilarity(SimilarityCriteria):
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        if self.metric is 'educlidean':
-            distance = np.abs(region)
-            index = distance.argmin()
+        from scipy.spatial import distance
+        if self.metric is 'euclidean':
+            region_data = region.get_current_region()
+            region_mean = np.mean(raw_image[region_data == 2], axis=0)
+            temp_region = np.zeros_like(region_data) + 10000
+            temp_region[region_data == 1] = distance.cdist(region_mean.reshape(1, region_mean.size), raw_image[region_data == 1].reshape(
+                region_data[region_data == 1].size,  region_mean.size), self.metric)[0, :]
+            index = np.unravel_index(temp_region.argmin(), region_data.shape)
+
             return index
         elif self.metric is 'mahalanobis':
             pass
@@ -440,28 +444,33 @@ class Region(object):
     """
     Distance measure.
     """
-    def __init__(self, seed, cur_region):
+    def __init__(self, cur_region):
         """
         Parameters
         -----------------------------------------------------
-        seed: the seed to generate a region, which should be ndarray type.
         cur_region: the current region.
         """
-        if not isinstance(seed, np.ndarray):
-            raise ValueError("The seed of the Region class  must be ndarray type. ")
-        else:
-            self.seed = seed
-
         if not isinstance(cur_region, np.ndarray):
             raise ValueError("The current region of the Region class must be ndarray type. ")
-        else:
-            self.cur_region = cur_region
 
-    def get_neighbor(self):
+        self.cur_region = cur_region
+
+    def __init__(self):
+        """
+        Default init function..
+        """
+
+    def set_current_region(self, cur_region):
         """
         Get the neighbor.
         """
-        return self.neighbor
+        self.cur_region = cur_region
+
+    def get_current_region(self):
+        """
+        Get the neighbor.
+        """
+        return self.cur_region
 
     def compute_IB(self):
         """
@@ -538,6 +547,7 @@ class Aggregator:
         Aggregation for different regions
         """
 
+
 class RandomSRG:
     """
     Seeded region growing based on random seeds.
@@ -583,8 +593,8 @@ class RandomSRG:
         self.aggregator = Aggregator(self.seeds, n_regions, raw_image)
         self.aggregator.aggregator()
 
-class AdaptiveSRG:
 
+class AdaptiveSRG:
     """
     Adaptive seeded region growing.
     """
