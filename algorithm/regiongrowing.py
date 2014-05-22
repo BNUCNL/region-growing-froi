@@ -32,6 +32,12 @@ class SeededRegionGrowing:
         self.connectivity = connectivity
         self.region_sequence = region_sequence
 
+    def set_target_image(self, target_image):
+        self.target_image = target_image
+
+    def get_target_image(self):
+        return self.target_image
+
     def set_seeds(self, seeds):
         self.seeds = seeds
 
