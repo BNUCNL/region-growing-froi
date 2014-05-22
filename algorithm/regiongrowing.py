@@ -124,6 +124,7 @@ class SeededRegionGrowing:
                 if inside(point, image_shape) and not region_neighbor[tuple(point)] and not cur_region[tuple(point)]:
                     region_neighbor[tuple(point)] = True
             cur_region[tuple(start_point)] = True
+            region_neighbor[tuple(start_point)] = False
             start_point = self.similarity_criteria.computing(region, self.target_image)
             region_size += 1
 
@@ -353,7 +354,6 @@ class NeighborSimilarity(SimilarityCriteria):
         temp_region[region_neighbor] = distance.cdist(region_mean.reshape(1, region_mean.size), raw_image
                                   [region_neighbor].reshape(region_neighbor.sum(), region_mean.size), self.metric)[0, :]
         index = np.unravel_index(temp_region.argmin(), cur_region.shape)
-
         return index
 
 
