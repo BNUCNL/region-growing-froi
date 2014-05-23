@@ -20,11 +20,11 @@ class SeededRegionGrowing:
         if isinstance(target_image, nib.nifti1.Nifti1Image):
             self.target_image = target_image.get_data()
             if len(target_image.shape) > 4 or len(target_image.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
+                raise ValueError("Target image must be a 2D/3D/4D or Nifti1Image format file.")
         elif isinstance(target_image, np.ndarray):
             self.target_image = target_image
             if len(target_image.shape) > 4 or len(target_image.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
+                raise ValueError("Target image must be a 2D/3D/4D or Nifti1Image format file.")
 
         self.seeds = seeds
         self.similarity_criteria = similarity_criteria
@@ -361,7 +361,7 @@ class StopCriteria(object):
     """
     Stop criteria.
     """
-    def __init__(self, name='region_size', threshold=None):
+    def __init__(self, name='region_size', threshold=None, step=None):
         """
         Parameters
         -----------------------------------------------------
@@ -376,6 +376,7 @@ class StopCriteria(object):
 
         self.name = name
         self.threshold = threshold
+        self.setp = step
 
     def set_name(self, name):
         """
@@ -389,6 +390,29 @@ class StopCriteria(object):
         """
         return self.name
 
+    def set_threshold(self, threshold):
+        """
+        Get the threshold of the stop criteria..
+        """
+        self.threshold = threshold
+
+    def get_threshold(self):
+        """
+        Get the threshold of the stop criteria..
+        """
+        return self.threshold
+
+    def set_step(self, step):
+        """
+        Get the step of the stop criteria..
+        """
+        self.step = step
+
+    def get_step(self):
+        """
+        Get the step of the stop criteria..
+        """
+        return self.step
 
     def computing(self):
         """
@@ -478,15 +502,21 @@ class Region(object):
         """
         Compute the inner boundary
         """
-        #Do something here.
-        pass
+        inner_b = []
+        # for i in inner_region_cor:
+        #     if self.is_neiflag(flag_image, i, 1):
+        #         if inner_b == []:
+        #             inner_b = i
+        #         else:
+        #             inner_b= np.vstack((inner_b, i))
+        return np.array(inner_b)
 
     def compute_EB(self):
         """
         Compute the external boundary
         """
         #Do something here.
-        pass
+        return self.get_region_neighbor()
 
 
 class Aggregator:
@@ -572,37 +602,36 @@ class AdaptiveSRG(SeededRegionGrowing):
     """
     Adaptive seeded region growing.
     """
-    def __init__(self, target_image, seeds, upperlimit, connectivity):
+    def __init__(self, target_image, seeds, similarity_criteria, stop_criteria, connectivity, region_sequence=None):
         if not isinstance(seeds, np.ndarray):
             seeds = np.array(seeds)
-        self.target_image = target_image
-        self.set_seeds(seeds)
-        self.connectivity = connectivity
-        self.get_uplimit = upperlimit
+
+        SeededRegionGrowing.__init__(self, target_image, seeds, similarity_criteria, stop_criteria, connectivity, region_sequence=None)
 
     def growing(self):
         """
         Adaptive region growing.
         """
-        image = self.target_image
-        seeds = Seeds(self.seeds)
-        similarity_criteria = NeighborSimilarity(metric='euclidean')
-        connectivity = Connectivity('26')
-
         region_sequence = []
-        child_vector = self.stop_criteria.computing()
-        for i in child_vector:
-            stop_criteria_temp = StopCriteria(name='region_size', threshold=i)
-            self.set_stop_criteria(stop_criteria_temp)
-            region = self.grow()
-            region_sequence.append(region)
-        return region_sequence
+        thresholds = self.stop_criteria.computing()
+        for threshold in thresholds:
+            self.get_stop_criteria().set_threshold(threshold)
+            self.get_stop_criteria().set_step(None)
+            region_sequence.append(self.grow())
+        return PCB(region_sequence, self.target_image)
 
-class RegionOptimize(Region):
+
+class RegionOptimizer():
     """
     Region optimizer.
     """
-    def __init__(self, target_image, seeds, upperlimit, connectivity):
+    def __init__(self, name="Region optimizer"):
+        """
+        Region optimizer init.
+        """
+        self.name = name
+
+    def optimize(self, region_sequence, raw_image, mask_image=None, prior=None):
         """
         Parameters
         -----------------------------------------------------
@@ -611,173 +640,61 @@ class RegionOptimize(Region):
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        self.image = target_image
-        self.seeds = seeds
-        self.uplimit = upperlimit
-        self.connectivity = connectivity
+        return self.optimize(self, region_sequence, raw_image, mask_image=None, prior=None)
 
-    def optimal_average_contrast(self):
+
+class PCB(RegionOptimizer):
+    """
+    PCB region optimizer.
+    """
+    def __init__(self, name="PCB region optimizer"):
         """
-        return average contrast list.
+        PCB region optimizer init.
         """
-        seeds = self.seeds
-        image = self.image
-        Num = self.uplimit
-        connectivity = self.connectivity
-        x, y, z = seeds
-        image_shape = image.shape
-        if not inside(seeds, image_shape):
-            print "The seed is out of the image range."
-            return False
+        self.name = name
 
-        contrast = []
-        region_size = 1
-        origin_t = image[x, y, z]
-        inner_list = [origin_t]
-        tmp_image = np.zeros_like(image)
+    def optimize(self, region_sequence, raw_image, mask_image=None, prior=None):
+        """
+        Parameters
+        -----------------------------------------------------
+        region_sequence: region sequence
+        opt_measurement: the optimize measurement.
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
+        """
+        for region in region_sequence:
+            outer_boundary = region.compute_EB()
+            inner_boundary = region.compute_IB()
+            contrast = contrast + [np.mean(inner_boundary_val) - np.mean(outer_boundary)]
 
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free, 4))
+        return optimizer_region
 
-        while region_size <= Num:
-            for i in range(int(connectivity)):
-                set0, set1, set2 = compute_offsets(len(image.shape), int(connectivity))[i]
-                xn, yn, zn = x + set0, y + set1, z + set2
-                if inside((xn, yn, zn), image_shape) and tmp_image[xn, yn, zn] == 0:
-                    neighbor_pos += 1
-                    neighbor_list[neighbor_pos] = [xn, yn, zn, image[xn, yn, zn]]
-                    tmp_image[xn, yn, zn] = 1
 
-            out_boundary = neighbor_list[np.nonzero(neighbor_list[:, 3]), 3]
+class ACB(RegionOptimizer):
+    """
+    ACB region optimizer.
+    """
+    def __init__(self, name="ACB region optimizer"):
+        """
+        ACB region optimizer init.
+        """
+        self.name = name
+
+    def optimize(self, region_sequence, raw_image, mask_image=None, prior=None):
+        """
+        Parameters
+        -----------------------------------------------------
+        region_sequence: region sequence
+        opt_measurement: the optimize measurement.
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
+        """
+        for region in region_sequence:
+            outer_boundary = region.compute_EB()
+            inner_boundary = region.compute_IB()
             contrast = contrast + [np.mean(np.array(inner_list)) - np.mean(out_boundary)]
 
-            tmp_image[x, y, z] = 2
-            region_size += 1
-
-            #if the length of neighbor_list is not enough,add another 10000
-            if neighbor_pos + 100 > neighbor_free:
-                neighbor_free += 10000
-                new_list = np.zeros((10000, 4))
-                neighbor_list = np.vstack((neighbor_list, new_list))
-
-            distance = np.abs(neighbor_list[:neighbor_pos + 1, 3] - np.tile(origin_t, neighbor_pos + 1))
-            index = distance.argmin()
-            x, y, z = neighbor_list[index][:3]
-            inner_list = inner_list + [image[x, y, z]]
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
-
-        ACB = []
-        region_sequence = AdaptiveSRG(image, seeds, Num, connectivity).grow()
-        for i in range(20, self.uplimit, 20):
-            ACB = ACB + [contrast[i]]
-        k = np.array(ACB).argmax()
-        print 20*(k+1)
-        return region_sequence[k]
-
-    def optimal_peripheral_contrast(self):
-        """
-        return average contrast list.
-        """
-        seeds = self.seeds
-        image = self.image
-        Num = self.uplimit
-        connectivity = self.connectivity
-        x, y, z = seeds
-        image_shape = image.shape
-        if not inside(seeds, image_shape):
-            print "The seed is out of the image range."
-            return False
-
-        contrast = []
-        region_size = 1
-        origin_t = image[x, y, z]
-        tmp_image = np.zeros_like(image)
-
-        default_space = 10000
-        outer_pos = -1
-        inner_pos = -1
-        inner_list = np.zeros((default_space, 4))
-        outer_boundary_list = np.zeros((default_space, 4))
-
-        while region_size <= Num:
-            inner_pos += 1
-            inner_list[inner_pos] = [x, y, z, image[x, y, z]]
-            for i in range(int(connectivity)):
-                set0, set1, set2 = compute_offsets(len(image.shape), int(connectivity))[i]
-                xn, yn, zn = x + set0, y + set1, z + set2
-                if inside((xn, yn, zn), image_shape) and tmp_image[xn, yn, zn] == 0:
-                    outer_pos += 1
-                    outer_boundary_list[outer_pos] = [xn, yn, zn, image[xn, yn, zn]]
-                    tmp_image[xn, yn, zn] = 1
-
-            outer_boundary = outer_boundary_list[np.nonzero(outer_boundary_list[:, 3]), 3]
-            inner_region_cor = inner_list[np.nonzero(inner_list[:, 3]), :3][0]
-            inner_boundary_cor = self.inner_boundary(tmp_image, np.array(inner_region_cor))
-
-            inner_boundary_val = []
-            if len(inner_boundary_cor.shape) == 1:
-                inner_boundary_val = inner_boundary_val + [image[inner_boundary_cor[0],
-                                                                 inner_boundary_cor[1], inner_boundary_cor[2]]]
-            else:
-                for i in inner_boundary_cor:
-                    inner_boundary_val = inner_boundary_val + [image[i[0], i[1], i[2]]]
-
-            contrast = contrast + [np.mean(inner_boundary_val) - np.mean(outer_boundary)]
-            tmp_image[x, y, z] = 2
-            region_size += 1
-
-            if outer_pos + 100 > default_space:
-                default_space += 10000
-                new_list = np.zeros((10000, 4))
-                outer_boundary_list = np.vstack((outer_boundary_list, new_list))
-
-            distance = np.abs(outer_boundary_list[:outer_pos + 1, 3] - np.tile(origin_t, outer_pos + 1))
-            index = distance.argmin()
-            x, y, z = outer_boundary_list[index][:3]
-
-            outer_boundary_list[index] = outer_boundary_list[outer_pos]
-            outer_pos -= 1
-
-        PCB = []
-        region_sequence = AdaptiveSRG(image, seeds, Num, connectivity).grow()
-        for i in range(20, self.uplimit, 20):
-            PCB = PCB + [contrast[i]]
-        k = np.array(PCB).argmax()
-        print 20*(k+1)
-        return region_sequence[k]
-
-    def is_neiflag(self, flag_image, coordinate, flag):
-        """
-        if coordinate has a neighbor with certain flag return True,else False.
-        """
-        x, y, z = coordinate
-        for j in range(self.connectivity):
-            set0, set1, set2 = self.get_connectivity()[j]
-            xn, yn, zn = x + set0, y + set1, z + set2
-            if flag_image[xn, yn, zn] == flag:
-                return True
-        return False
-
-    def inner_boundary(self, flag_image, inner_region_cor):
-        """
-        find the inner boundary of the region.
-        """
-        inner_b = []
-        for i in inner_region_cor:
-            if self.is_neiflag(flag_image, i, 1):
-                if inner_b == []:
-                    inner_b = i
-                else:
-                    inner_b= np.vstack((inner_b, i))
-        return np.array(inner_b)
-
-    def other_optimize(self):
-        """
-        Get the optimize region.
-        """
-        return self.optimize()
+        return optimizer_region
 
 
 
