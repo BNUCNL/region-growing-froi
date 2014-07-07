@@ -4,8 +4,6 @@ import nibabel as nib
 from algorithm.regiongrowing import *
 
 if __name__ == "__main__":
-    print os.getcwd()
-
     img4d = nib.load("../data/4DVolume.nii.gz")
     affine4d = img4d.get_affine()
     target_image_4d = img4d.get_data()
@@ -25,12 +23,12 @@ if __name__ == "__main__":
     connectivity = Connectivity('6')
 
     srg = AdaptiveSRG(target_image_4d, seeds3d, similarity_criteria, stop_criteria, connectivity)
-    output4d = srg.grow().get_current_region()
+    output4d = srg.growing().get_current_region()
     nib.save(nib.Nifti1Image(output4d.astype(int), affine3d), "../tests/SeededRegionGrowing4D.nii.gz")
     print 'SeededRegionGrowing4D.nii.gz was created.'
 
     srg.set_target_image(target_image_3d)
-    output3d = srg.grow().get_current_region()
+    output3d = srg.growing().get_current_region()
     nib.save(nib.Nifti1Image(output3d.astype(int), affine3d), "../tests/SeededRegionGrowing3D.nii.gz")
     print 'SeededRegionGrowing3D.nii.gz was created.'
 
@@ -38,7 +36,7 @@ if __name__ == "__main__":
     seeds2d = Seeds(np.array([24, 36]))
     srg.set_seeds(seeds2d)
     srg.set_target_image(target_image_2d)
-    output2d = srg.grow().get_current_region()
+    output2d = srg.growing().get_current_region()
     nib.save(nib.Nifti1Image(output2d.astype(int), affine2d), "../tests/SeededRegionGrowing2D.nii.gz")
 
     print 'SeededRegionGrowing2D.nii.gz was created.'
