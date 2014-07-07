@@ -6,6 +6,6 @@ from algorithm.neighbor import *
 
 if __name__ == "__main__":
     print os.getcwd()
-    nb = Connectivity(3,26,[15,15,15])
+    nb = Connectivity(3, 26, (15, 15, 15))
     a = nb.compute()
     print a

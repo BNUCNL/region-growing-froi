@@ -9,8 +9,7 @@ Generate neighbor for a refer point.
 import numpy as np
 
 
-
-class SpatialNeighbor:
+class SpatialNeighbor(object):
     """Define spatial neighbor for a pixel or voxel.
     
     Return
@@ -23,19 +22,19 @@ class SpatialNeighbor:
         Editor: 
     
     """
-    def __init__(self, img_dim, nb_size, ref_points):
 
-        if img_dim != 2 or img_dim != 3:
+    def __init__(self, img_shape, nb_size, ref_point):
+        if len(img_shape) == 2 or len(img_shape) == 3:
+            self.img_shape = img_shape
+            self.nb_size = nb_size
+            self.ref = ref_point
+
+        else:
             raise ValueError("The image dimension should be 2 or 3")
 
-        self.img_dim =  img_dim
-        self.img_size  = nb_size
-        self.ref_points = ref_points
 
     def compute(self):
         return self.computing()
-
-
 
 
 class Connectivity(SpatialNeighbor):
@@ -52,52 +51,58 @@ class Connectivity(SpatialNeighbor):
     
     """
 
-    def __init__(self, img_dim, nb_size, ref_points):
+    def __init__(self, img_shape, nb_size, ref_point):
 
-        super(Connectivity,self).__init__(img_dim, nb_size, ref_points)
+        """
 
-        if self.img_dim == 2: # 2D image 4, 6, 8-connected
+        :rtype : object
+        """
+        super(Connectivity, self).__init__(img_shape, nb_size, ref_point)
+
+        offsets = []
+        if len(self.img_shape) == 2:  # 2D image 4, 6, 8-connected
             if self.nb_size == 4:
-                offsets = np.array([[1, 0],[-1, 0],
-                                    [0, 1],[0, -1]])
+                offsets = np.array([[1, 0], [-1, 0],
+                                    [0, 1], [0, -1]])
             elif self.nb_size == 6:
-                offsets = np.array([[1, 0],[-1, 0],
-                                    [0, 1],[0, -1],
+                offsets = np.array([[1, 0], [-1, 0],
+                                    [0, 1], [0, -1],
                                     [1, 1], [-1, -1]])
             elif self.nb_size == 8:
-                offsets = np.array([[1, 0],[-1, 0],
-                                    [0, 1],[0, -1],
-                                    [1, 1], [-1, -1]
+                offsets = np.array([[1, 0], [-1, 0],
+                                    [0, 1], [0, -1],
+                                    [1, 1], [-1, -1],
                                     [1, -1], [-1, 1]])
-        elif self.img_dim == 3: # 3D volume 6, 18, 26-connected
+        elif len(self.img_shape) == 3:  # 3D volume 6, 18, 26-connected
             if self.nb_size == 6:
-                offsets = np.array([[1, 0, 0],[-1, 0, 0],
-                                    [0, 1, 0],[0, -1, 0],
-                                    [0, 0, -1], [0, 0, -1]])      
+                offsets = np.array([[1, 0, 0], [-1, 0, 0],
+                                    [0, 1, 0], [0, -1, 0],
+                                    [0, 0, -1], [0, 0, -1]])
             elif self.nb_size == 18:
-                offsets = np.array([[0,-1,-1],[-1, 0,-1],[0, 0,-1],
-                                    [1, 0,-1],[0, 1,-1],[-1,-1, 0],
-                                    [0,-1, 0],[1,-1, 0],[-1, 0, 0],
-                                    [1, 0, 0],[-1, 1, 0],[0, 1, 0],
-                                    [1, 1, 0],[0,-1, 1],[-1, 0, 1],
-                                    [0, 0, 1],[1, 0, 1],[0, 1, 1]])
-        
+                offsets = np.array([[0, -1, -1], [-1, 0, -1], [0, 0, -1],
+                                    [1, 0, -1], [0, 1, -1], [-1, -1, 0],
+                                    [0, -1, 0], [1, -1, 0], [-1, 0, 0],
+                                    [1, 0, 0], [-1, 1, 0], [0, 1, 0],
+                                    [1, 1, 0], [0, -1, 1], [-1, 0, 1],
+                                    [0, 0, 1], [1, 0, 1], [0, 1, 1]])
+
             elif self.nb_size == 26:
-                offsets = np.array([[-1,-1,-1],[0,-1,-1],[1,-1,-1],
-                                    [-1, 0,-1],[0, 0,-1],[1, 0,-1],
-                                    [-1, 1,-1],[0, 1,-1],[1, 1,-1],
-                                    [-1,-1, 0],[0,-1, 0],[1,-1, 0], 
-                                    [-1, 0, 0],[1, 0, 0],[-1, 1, 0],
-                                    [0, 1, 0],[1, 1, 0],[-1,-1, 1],
-                                    [0,-1, 1],[1,-1, 1],[-1, 0, 1],
-                                    [0, 0, 1],[1, 0, 1],[-1, 1, 1],
-                                    [0, 1, 1],[1, 1, 1]])
-        self.offsets = offsets.T
+                offsets = np.array([[-1, -1, -1], [0, -1, -1], [1, -1, -1],
+                                    [-1, 0, -1], [0, 0, -1], [1, 0, -1],
+                                    [-1, 1, -1], [0, 1, -1], [1, 1, -1],
+                                    [-1, -1, 0], [0, -1, 0], [1, -1, 0],
+                                    [-1, 0, 0], [1, 0, 0], [-1, 1, 0],
+                                    [0, 1, 0], [1, 1, 0], [-1, -1, 1],
+                                    [0, -1, 1], [1, -1, 1], [-1, 0, 1],
+                                    [0, 0, 1], [1, 0, 1], [-1, 1, 1],
+                                    [0, 1, 1], [1, 1, 1]])
+
+        self.offsets = offsets
 
 
     def computing(self):
-        coors = self.ref_points + self.offsets
-        return coors(is_in_image(coors,self.img_size))
+        coors = self.ref + self.offsets
+        return coors[is_in_image(coors, self.img_shape), :]
 
 
 class Sphere(SpatialNeighbor):
@@ -111,33 +116,32 @@ class Sphere(SpatialNeighbor):
     """
 
 
-    def __init__(self, img_dim, nb_size, ref_points,):
+    def __init__(self, img_shape, nb_size, ref_point, ):
 
-        super(Sphere,self).__init__(img_dim, nb_size, ref_points)
+        super(Sphere, self).__init__(img_shape, nb_size, ref_point)
 
         offsets = []
-        if self.img_dim == 2:
+        if len(self.img_shape) == 2:
             for x in np.arange(-self.nb_size, self.nb_size + 1):
                 for y in np.arange(-self.nb_size, self.nb_size + 1):
-                    if np.linalg.norm([x,y]) <= self.nb_size:
-                            offsets.append([x,y])
+                    if np.linalg.norm([x, y]) <= self.nb_size:
+                        offsets.append([x, y])
 
-        elif self.img_dim == 3:
+        elif len(self.img_shape) == 3:
             for x in np.arange(-self.nb_size, self.nb_size + 1):
                 for y in np.arange(-self.nb_size, self.nb_size + 1):
                     for z in np.arange(-self.nb_size, self.nb_size + 1):
-                        if np.linalg.norm([x,y,z]) <= self.nb_size:
-                            offsets.append([x,y,z])
+                        if np.linalg.norm([x, y, z]) <= self.nb_size:
+                            offsets.append([x, y, z])
 
         self.offsets = offsets
 
 
-
     def computing(self):
-        coors = self.ref_points + self.offsets
-        return coors(is_in_image(coors,self.img_size))
+        coors = self.ref + np.array(self.offsets)
+        return coors[is_in_image(coors, self.img_shape), :]
 
-     
+
 class Cube(SpatialNeighbor):
     """
     
@@ -148,27 +152,27 @@ class Cube(SpatialNeighbor):
     
     """
 
-    def __init__(self, img_dim, nb_size, ref_points,):
-        super(Cube,self).__init__(img_dim, nb_size, ref_points)
+    def __init__(self, img_shape, nb_size, ref_points, ):
+        super(Cube, self).__init__(img_shape, nb_size, ref_points)
 
         offsets = []
-        if self.nb_dim == 2:
+        if len(self.img_shape) == 2:
             for x in np.arange(-self.nb_size, self.nb_size + 1):
                 for y in np.arange(-self.nb_size, self.nb_size + 1):
-                    offsets.append([x,y])
+                    offsets.append([x, y])
 
-        elif self.nb_dim == 3:
+        elif len(self.img_shape) == 3:
             for x in np.arange(-self.nb_size, self.nb_size + 1):
                 for y in np.arange(-self.nb_size, self.nb_size + 1):
                     for z in np.arange(-self.nb_size, self.nb_size + 1):
-                        offsets.append([x,y,z])
+                        offsets.append([x, y, z])
+
+        self.offsets = offsets
 
 
     def computing(self):
-        coors = self.ref_points + self.offsets
-        return coors(is_in_image(coors,self.img_size))
-
-
+        coors = self.ref + np.array(self.offsets)
+        return coors[is_in_image(coors, self.img_shape), :]
 
 
 def is_in_image(coors, image_shape):
@@ -181,12 +185,27 @@ def is_in_image(coors, image_shape):
         coors = coors.reshape(1, len(image_shape))
 
     if len(coors.shape) == 2:
-        return  np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
-                        coors[:, 1] >= 0, coors[:, 1] < image_shape[1]], axis=0)
+        return np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
+                       coors[:, 1] >= 0, coors[:, 1] < image_shape[1]], axis=0)
     elif len(coors.shape) == 3:
-        return  np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
-                        coors[:, 1] >= 0, coors[:, 1] < image_shape[1],
-                        coors[:, 2] >= 0, coors[:, 2] < image_shape[2]], axis=0)
+        return np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
+                       coors[:, 1] >= 0, coors[:, 1] < image_shape[1],
+                       coors[:, 2] >= 0, coors[:, 2] < image_shape[2]], axis=0)
+
+
+if __name__ == "__main__":
+    conn = Connectivity((20, 20, 20), 26, (20, 15, 15))
+    print 'Connectivity\n', conn.compute()
+
+    sph = Sphere((20, 20, 20), 3, (20, 19, 18))
+    print 'Sphere\n', sph.compute()
+
+    cube = Cube((20, 20, 20), 3, (20, 19, 18))
+    print 'Cube\n', cube.compute()
+
+
+
+
 
 
 
