@@ -5,11 +5,7 @@
     
 """
 
-import scipy
 import numpy as np
-from math import pi
-import nibabel as nib
-import scipy.ndimage as ndimagei
 from scipy import sparse
 conn_dict = {6:1, 18:2, 26:3}
 import pdb
@@ -24,7 +20,7 @@ class neighbor:
     
     Contributions
     -------------
-        Author: 
+        Author: Zonglei Zhen
         Editor: 
     
     """
@@ -149,14 +145,14 @@ class cube(neighbor):
 
 def get_bound(low, high, v, dist):
     """
-    
+
     Contributions
     -------------
-        Author: 
-        Editor: 
+        Author:
+        Editor:
 
     """
-    
+
     x = v - dist
     if x < low:
         x = low
@@ -204,14 +200,14 @@ def out_of_image(v, shape):
             
 def dist(v1, v2, res):
     """
-    
+
     Contributions
     -------------
-        Author: 
-        Editor: 
-    
+        Author:
+        Editor:
+
     """
-    
+
     return ((res[0] * (v1[0] - v2[0])) ** 2 +
             (res[1] * (v1[1] - v2[1])) ** 2 +
             (res[2] * (v1[2] - v2[2])) ** 2) ** 0.5
@@ -221,11 +217,11 @@ class neighbor_shape():
             self.nbdim = nbdim
             self.nbsize = nbsize
             self.shape_type = shape_type
-                                
+
 
 class  volneighbors(pixelconn):
     """ A class to compute the neighbor index for non zeros elements in volume
-    
+
     Parameters
     -------
         imgdat: array-like.
@@ -237,21 +233,21 @@ class  volneighbors(pixelconn):
                 shape of the spatial constraints,
                 when using 'fast_cube', nbsize must be 4 or 6 or 8 for nbdim 2,
                 and 6 or 18 or 26 for nbdim 3.
-        
+
     Return
     -------
         volneighbors
             volnb[v][0]: the 1d index for v
             volnb[v][1] 1d neighbor index for v
             volnb[v][2]: neighbor distance to v
-    
+
     Contributions
     -------------
-        Author: 
+        Author:
         Editor: conxz
 
     """
-    
+
     def __init__(self, mask_coords,img_dims, nbdim=3, nbsize=26, shape='fast_cube'):
         pdb.set_trace()
         self.mask_coords = mask_coords
@@ -259,7 +255,7 @@ class  volneighbors(pixelconn):
         self.vol_num = np.shape(mask_coords)[0]
 #        self.imgidx1d = np.array(np.nonzero(self.data1d > 0)).T
 #        self.voxnum = np.shape(self.imgidx1d)[0]
-        
+
         if shape == 'fast_cube':
             self.nb_shape = pixelconn(nbdim, nbsize)
         elif shape == 'sphere':
@@ -267,40 +263,40 @@ class  volneighbors(pixelconn):
         elif shape == 'cube':
             self.nb_shape = cube(nbdim, nbsize)
         else:
-           raise RuntimeError('shape should be \'fast_cube\' or \'sphere\' or \'cube\'.') 
+           raise RuntimeError('shape should be \'fast_cube\' or \'sphere\' or \'cube\'.')
 
 
-        #number of neighbor voxels  
+        #number of neighbor voxels
         self.nb_num = np.shape(self.nb_shape.compute_offsets())[1]
 
     def get_offsets_dist(self,offsets):
-    
-    #    Compute neighbor distance.
-    
 
-        
+    #    Compute neighbor distance.
+
+
+
         offsets_dist = np.zeros(len(offsets))
         for n in range(len(offsets)):
             offsets_dist[n] = np.linalg.norm(offsets[n])
 
         return offsets_dist
-    
+
     def compute_offsets(self):
-    
+
     #    Compute neighbor offsets index.
         mask_coords = self.mask_coords
         vol_num = self.vol_num
         nb_num = self.nb_num
         dims = self.dims
         mask_idx = np.ravel_multi_index(self.mask_coords.T, dims)
-         
+
         offsets = self.nb_shape.compute_off()
         ds_idx = np.arange(vol_num)
         volid = np.zeros(nb_num*vol_num)
         nbid = np.zeros(nb_num*vol_num)
         is_nb = np.zeros(nb_num*vol_num)
-        
-        
+
+
         count = 0
         for v in range(self.vol_num):
             v3d = mask_coords[v,:]
@@ -321,7 +317,7 @@ class  volneighbors(pixelconn):
         return neighbor_sparse_matrix
 
 class  ncut_volneighbors(pixelconn):
-    
+
     def __init__(self, imgdat, nbdim=3, nbsize=26, shape='fast_cube'):
  #       pdb.set_trace()
         self.data = imgdat
