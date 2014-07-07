@@ -5,8 +5,6 @@ import nibabel as nib
 from algorithm.regiongrowing import *
 
 if __name__ == "__main__":
-    print os.getcwd()
-
     img4d = nib.load("../data/4DVolume.nii.gz")
     affine4d = img4d.get_affine()
     target_image_4d = img4d.get_data()
