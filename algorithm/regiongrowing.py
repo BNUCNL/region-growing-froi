@@ -621,6 +621,7 @@ class AdaptiveSRG(SeededRegionGrowing):
         return PCB(region_sequence, self.target_image)
 
 
+
 class RegionOptimizer():
     """
     Region optimizer.
