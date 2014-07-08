@@ -1,8 +1,10 @@
+import random
+
 import numpy as np
 import nibabel as nib
+
 from connectivity import compute_offsets
 from utils import inside
-import random
 
 
 class SeededRegionGrowing:
@@ -13,9 +15,9 @@ class SeededRegionGrowing:
         """
         Parameters
         -----------------------------------------------------
-        target_image: input image, a 2D/3D Nifti1Image format file
+        target_image: input image, a 2D/3D/4D Nifti1Image object
         seeds: a set of coordinates or a region mask
-        value the stop threshold.
+        value: stop threshold.
         """
         if isinstance(target_image, nib.nifti1.Nifti1Image):
             self.target_image = target_image.get_data()
