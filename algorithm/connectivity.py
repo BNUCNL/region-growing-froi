@@ -2,6 +2,7 @@
 import numpy as np
 
 
+
 def compute_offsets(nbdim, nbsize):
     """
     compute the offsets.

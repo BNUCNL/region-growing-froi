@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def inside(coors, image_shape):
+def is_inside(coors, image_shape):
     """
     whether the coordinate in the range of image.
     """
