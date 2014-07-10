@@ -5,7 +5,6 @@
 Generate neighbor for a refer point.
 
 """
-
 import numpy as np
 
 
@@ -99,7 +98,6 @@ class Connectivity(SpatialNeighbor):
 
         self.offsets = offsets
 
-
     def computing(self):
         coors = self.ref + self.offsets
         return coors[is_in_image(coors, self.img_shape), :]
@@ -114,7 +112,6 @@ class Sphere(SpatialNeighbor):
         Editor: 
     
     """
-
 
     def __init__(self, img_shape, nb_size, ref_point, ):
 
@@ -135,7 +132,6 @@ class Sphere(SpatialNeighbor):
                             offsets.append([x, y, z])
 
         self.offsets = offsets
-
 
     def computing(self):
         coors = self.ref + np.array(self.offsets)
@@ -168,7 +164,6 @@ class Cube(SpatialNeighbor):
                         offsets.append([x, y, z])
 
         self.offsets = offsets
-
 
     def computing(self):
         coors = self.ref + np.array(self.offsets)

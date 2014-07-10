@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import nibabel as nib
+from scipy.spatial import distance
 
 
 class SeededRegionGrowing:
@@ -13,28 +14,40 @@ class SeededRegionGrowing:
         """
         Parameters
         -----------------------------------------------------
-        target_image: input image, a 2D/3D/4D Nifti1Image object
-        seeds: a set of coordinates or a region mask
-        value: stop threshold.
+        target_image: input image, a 2D/3D/4D Nifti1Image object or N-D array
+        seeds: an instance of class Seed
+        similarity_criteria: an instance of class SimilarityCriteria
+        stop_criteria: an instance of class StopCriteria
+        neighbor: an instance of class Connectivity(SpatialNeighbor)
         """
+
         if isinstance(target_image, nib.nifti1.Nifti1Image):
             target_image = target_image.get_data()
 
         if 2 <= len(target_image.shape) <= 4:
-            self.target_image = target_image
+            self.image = target_image
         else:
             raise ValueError("Target image must be a 2D/3D/4D.")
 
         self.seeds = seeds
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
-        self.region_sequence = None
+        self.neighbor = neighbor
 
-    def set_target_image(self, target_image):
-        self.target_image = target_image
+        region_label = self.seeds
+        region_neighbor = []
+        for i in range(len(self.seeds.coords)):
+            for j in range(len(self.seeds.coords[i])):
+                region_neighbor = self.neighbor(self.seeds.coords)
 
-    def get_target_image(self):
-        return self.target_image
+        self.region = Region(region_label, region_neighbor)
+
+
+    def set_image(self, target_image):
+        self.image = target_image
+
+    def get_image(self):
+        return self.image
 
     def set_seeds(self, seeds):
         self.seeds = seeds
@@ -78,56 +91,38 @@ class SeededRegionGrowing:
         """
         return self.get_similarity_criteria()
 
-    def set_region_sequence(self, region_sequence):
+    def set_region(self, region):
         """
         Set the region sequence.
         """
-        self.region_sequence = region_sequence
+        self.region = region
 
     def get_region_sequence(self):
         """
         Get the region sequence..
         """
-        return self.region_sequence
+        return self.region
 
     def grow(self):
         """
-        Fixed threshold region growing.
+        growing  a region with specified similarity and stop criterion
+
         """
 
-        image_shape = self.target_image.shape
-        if len(image_shape) == 4:
-            image_shape = self.target_image.shape[:3]
-            self.clone_image = self.target_image[..., 0].copy()
-        else:
-            self.clone_image = self.target_image
+        while not self.stop_criteria.isstop():
+            nearest_neighbor = self.similarity_criteria.computing(self.region, self.image)
+            self.region.add_label(nearest_neighbor)
+            self.neighbor.add_neighbor(self.neighbor(nearest_neighbor))
 
-        region_neighbor = np.zeros_like(self.clone_image, dtype=np.bool)
-        cur_region = np.zeros_like(self.clone_image, dtype=np.bool)
-        region_size = 1
-        region = Region(region_neighbor, cur_region)
-
-        for i in range(self.seeds.coords.shape[0]):
-            cur_region[tuple(self.seeds.coords[i])] = True
-
-        threshold = self.stop_criteria.computing
-        while region_size <= threshold:
-            points = self.connectivity.computing
-            for point in points:
-                if inside(point, image_shape) and not region_neighbor[tuple(point)] and not cur_region[tuple(point)]:
-                    region_neighbor[tuple(point)] = True
-            cur_region[tuple(start_point)] = True
-            region_neighbor[tuple(start_point)] = False
-            start_point = self.similarity_criteria.computing
-            region_size += 1
-
-        return region
+            self.stop_criteria.computing(self.region, self.image)
+        return self.region
 
 
 class Seeds(object):
     """
     Seeds.
     """
+
     def __init__(self, coords):
         """
         Parameters
@@ -141,8 +136,7 @@ class Seeds(object):
 
     def generating(self):
         """
-        Generating new seeds.
-        """
+        Generating new seeds.       """
         return self.coords
 
 
@@ -184,8 +178,9 @@ class RandomSeeds(Seeds):
 
 class SimilarityCriteria:
     """
-    Similarity criteria..
+    Similarity criteria: compute the similairity between region and neighbor voxels
     """
+
     def __init__(self, metric='educlidean'):
         """
         Parameters
@@ -209,7 +204,7 @@ class SimilarityCriteria:
         """
         return self.metric
 
-    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
+    def computing(self, region, img=None, mask_img=None, prior_img=None):
         """
         Compute the  similarity.
         Parameters
@@ -219,244 +214,164 @@ class SimilarityCriteria:
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        return self.computing()
 
-
-class HomogeneitySimilarity(SimilarityCriteria):
-    """
-    Homogeneity similarity.
-    """
-    def __init__(self, metric='standard_deviation'):
-        """
-        Parameters
-        -----------------------------------------------------
-        metric: 'standard_deviation', 'kendell_cc', 'mean_cross_correlation', default is 'standard_deviation'.
-        """
-        SimilarityCriteria.__init__(self, metric)
-
-    def set_metric(self, metric):
-        """
-        Set the metric of the homogeneity similarity...
-        """
-        self.metric = metric
-
-    def get_metric(self):
-        """
-        Get the metric of the homogeneity similarity...
-        """
-        return self.metric
-
-    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
-        """
-        Compute the homogeneity similarity.
-        Parameters
-        -----------------------------------------------------
-        region:The region growing.
-        raw_image: The raw image.
-        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
-        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        if self.metric is 'standard_deviation':
-            pass
-        elif self.metric is 'kendell_cc':
-            pass
-        elif self.metric is 'mean_cross_correlation':
-            pass
-        else:
-            return None
-
-
-class MorphologySimilarity(SimilarityCriteria):
-    """
-    Morphology similarity.
-    """
-    def __init__(self, metric='size'):
-        """
-        Parameters
-        -----------------------------------------------------
-        metric: 'size', 'volume', 'shape', default is 'size'
-        """
-        SimilarityCriteria.__init__(self, metric)
-
-    def set_metric(self, metric):
-        """
-        Set the metric of the morphology similarity...
-        """
-        self.metric = metric
-
-    def get_metric(self):
-        """
-        Get the metric of the morphology similarity...
-        """
-        return self.metric
-
-    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
-        """
-        Compute the morphology similarity.
-        Parameters
-        -----------------------------------------------------
-        region:The region growing.
-        raw_image: The raw image.
-        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
-        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        if self.metric is 'size':
-            pass
-        elif self.metric is 'volume':
-            pass
-        elif self.metric is 'shape':
-            pass
-        else:
-            return None
-
-
-class NeighborSimilarity(SimilarityCriteria):
-    """
-    Neighbor similarity.
-    """
-    def __init__(self, metric='educlidean'):
-        """
-        Parameters
-        -----------------------------------------------------
-        metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
-        """
-        SimilarityCriteria.__init__(self, metric)
-
-    def set_metric(self, metric):
-        """
-        Set the metric of the neighbor similarity...
-        """
-        self.metric = metric
-
-    def get_metric(self):
-        """
-        Get the metric of the neighbor similarity...
-        """
-        return self.metric
-
-    def computing(self, region, raw_image, mask_image=None, prior_image=None):
-        """
-        Compute the neighbor similarity.
-        Parameters
-        -----------------------------------------------------
-        region:The region growing.
-        raw_image: The raw image.
-        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
-        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
-        from scipy.spatial import distance
-
-        cur_region = region.get_current_region()
-        region_neighbor = region.get_region_neighbor()
-        region_mean = np.mean(raw_image[cur_region], axis=0)
-        temp_region = np.zeros_like(cur_region) + 10000
-        temp_region[region_neighbor] = distance.cdist(region_mean.reshape(1, region_mean.size), raw_image
-                                  [region_neighbor].reshape(region_neighbor.sum(), region_mean.size), self.metric)[0, :]
-        index = np.unravel_index(temp_region.argmin(), cur_region.shape)
-        return index
+        region_mean = np.mean(img[region.extent, :])
+        neighbor_intensity = img(region.neighbor)
+        dist = distance.cdist(region_mean, neighbor_intensity, self.metric)
+        index = dist.argmin()
 
 
 class StopCriteria(object):
     """
     Stop criteria.
     """
-    def __init__(self, name='region_size', threshold=None):
+
+    def __init__(self, target_image, region, criterion_type='morphlogy', criterion_metric='region_size',
+                 threshold=None):
         """
         Parameters
         -----------------------------------------------------
         name:'region_homogeneity','region_morphology','region_difference', 'region_size', default is 'region_difference'
         threshold: a int value or None, default is None which means the adaptive method will be used.
         """
-        if not isinstance(name, str):
-            raise ValueError("The name of the stop criteria should be str type.")
 
-        if not isinstance(threshold, int) and threshold is None:
-            raise ValueError("The threshold of the stop criteria should be int type or None.")
-
-        self.name = name
+        self.type = criterion_type
+        self.name = criterion_metric
         self.threshold = threshold
+        self.stop = False
 
-    def set_name(self, name):
+    def set_metric(self, metric_name):
         """
         Get the name of the stop criteria..
         """
-        self.metric = name
+        self.metric = metric_name
 
-    def get_name(self):
+    def get_metric(self):
         """
         Get the name of the stop criteria..
         """
-        return self.name
+        return self.metric
 
 
-    def computing(self):
+    def computing(self, region, raw_image=None, mask_image=None, prior_image=None):
         """
         Set the stop criteria.
         """
-        return self.threshold
+        if cmp(self.type, 'morphology'):
+            if cmp(self.metric, 'region_size'):
+                region_size = np.count_nonzero(region.extent)
+                if region_size >= self.threshold:
+                    self.stop = True
+
+    def isstop(self):
+        return self.stop
 
 
 class Region(object):
     """
     Region
     """
-    def __init__(self, region_neighbor, cur_region):
+
+    def __init__(self, region_label, region_neighbor):
         """
         Parameters
         -----------------------------------------------------
-        cur_region: the current region.
+        region_extent and region_neighbor is Nx3 array which keep the coordinates of the voxels
         """
-        if not isinstance(region_neighbor, np.ndarray):
-            raise ValueError("The neighbor of the Region class must be ndarray type. ")
-        if not isinstance(cur_region, np.ndarray):
+
+        if not isinstance(region_label, np.ndarray):
             raise ValueError("The current region of the Region class must be ndarray type. ")
 
-        self.region_neighbor = region_neighbor
-        self.cur_region = cur_region
+        if not isinstance(region_neighbor, np.ndarray):
+            raise ValueError("The neighbor of the Region class must be ndarray type. ")
 
-    def set_current_region(self, cur_region):
+        buffer_size = 10000
+        self.label = np.zeros((buffer_size, 4))
+        self.neighbor = np.zeros(buffer_size, 4)
+
+        self.label_size = region_label.shape[0]
+        self.label[:self.label_size, :] = region_label
+
+        self.neighbor_size = region_neighbor.shape[0]
+        self.neighbor[:self.neighbor_size, :] = region_neighbor
+
+
+    def set_label(self, region_label):
         """
         Get the neighbor.
         """
-        self.cur_region = cur_region
+        self.label = region_label
 
-    def get_current_region(self):
+    def get_label(self):
         """
         Get the neighbor.
         """
-        return self.cur_region
+        return self.label
 
-    def set_region_neighbor(self, region_neighbor):
+    def set_neighbor(self, region_neighbor):
         """
         Set the region neighbor.
         """
-        self.region_neighbor = region_neighbor
+        self.neighbor = region_neighbor
 
-    def get_region_neighbor(self):
+    def get_neighbor(self):
         """
         Get the  region neighbor.
         """
-        return self.region_neighbor
+        return self.neighbor
 
-    def compute_IB(self):
-        """
+    def add_label(self, new_label):
+
+        self.label[self.label_size:(self.label_size + new_label.shape[0]), :] = new_label
+        self.label_size = self.label_size + new_label.shape[0]
+
+    def add_neighbor(self, new_neighbor):
+
+        self.label[self.neighbor_size:(self.neighbor_size + new_neighbor.shape[0]), :] = new_neighbor
+        self.neighbor_size = self.neighbor_size + new_neighbor.shape[0]
+
+        for point in points:
+            if inside(point, image_shape) and not region_neighbor[tuple(point)] and not cur_region[tuple(point)]:
+                region_neighbor[tuple(point)] = True
+
+
+def compute_inner_boundary(self):
+    """
         Compute the inner boundary
         """
         #Do something here.
         pass
 
-    def compute_EB(self):
-        """
+
+def compute_external_boundary(self):
+    """
         Compute the external boundary
         """
         #Do something here.
         pass
 
 
+class RegionOptimize(Region):
+    """
+    Region optimizer.
+    """
+
+    def __init__(self, target_image, seeds, upperlimit, connectivity):
+        """
+        Parameters
+        -----------------------------------------------------
+        region_sequence: region sequence
+        opt_measurement: the optimize measurement.
+        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
+        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
+        """
+
+
 class Aggregator:
     """
     Seeded region growing based on random seeds.
     """
+
     def __init__(self, seeds, region_sequence, raw_image, aggregator_type='average'):
         """
         Parameters
@@ -490,7 +405,8 @@ class RandomSRG:
     """
     Seeded region growing based on random seeds.
     """
-    def __init__(self, n_seeds, stop_criteria,):
+
+    def __init__(self, n_seeds, stop_criteria, ):
         """
         Parameters
         -----------------------------------------------------
@@ -536,6 +452,7 @@ class AdaptiveSRG(SeededRegionGrowing):
     """
     Adaptive seeded region growing.
     """
+
     def __init__(self, target_image, seeds, upperlimit, connectivity):
         if not isinstance(seeds, np.ndarray):
             seeds = np.array(seeds)
@@ -561,20 +478,6 @@ class AdaptiveSRG(SeededRegionGrowing):
             region = self.grow()
             region_sequence.append(region)
         return region_sequence
-
-class RegionOptimize(Region):
-    """
-    Region optimizer.
-    """
-    def __init__(self, target_image, seeds, upperlimit, connectivity):
-        """
-        Parameters
-        -----------------------------------------------------
-        region_sequence: region sequence
-        opt_measurement: the optimize measurement.
-        mask_image: the mask image may be used in the compute process. which should be a ndarray type.
-        prior_image:the prior image may be used in the compute process. which should be a ndarray type.
-        """
 
 
 if __name__ == "__main__":
