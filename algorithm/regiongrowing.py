@@ -3,15 +3,13 @@ import random
 import numpy as np
 import nibabel as nib
 
-from connectivity import compute_offsets
-from utils import inside
-
 
 class SeededRegionGrowing:
     """
     Seeded region growing with a fixed threshold.
     """
-    def __init__(self, target_image, seeds, similarity_criteria, stop_criteria, connectivity, region_sequence=None):
+
+    def __init__(self, target_image, seeds, similarity_criteria, stop_criteria, neighbor):
         """
         Parameters
         -----------------------------------------------------
@@ -20,19 +18,17 @@ class SeededRegionGrowing:
         value: stop threshold.
         """
         if isinstance(target_image, nib.nifti1.Nifti1Image):
-            self.target_image = target_image.get_data()
-            if len(target_image.shape) > 4 or len(target_image.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
-        elif isinstance(target_image, np.ndarray):
+            target_image = target_image.get_data()
+
+        if 2 <= len(target_image.shape) <= 4:
             self.target_image = target_image
-            if len(target_image.shape) > 4 or len(target_image.shape) < 2:
-                raise ValueError("Target image must be a 2D/3D or Nifti1Image format file.")
+        else:
+            raise ValueError("Target image must be a 2D/3D/4D.")
 
         self.seeds = seeds
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
-        self.connectivity = connectivity
-        self.region_sequence = region_sequence
+        self.region_sequence = None
 
     def set_target_image(self, target_image):
         self.target_image = target_image
@@ -58,17 +54,17 @@ class SeededRegionGrowing:
         """
         return self.stop_criteria
 
-    def set_connectivity(self, connectivity):
+    def set_neighbor(self, neighbor):
         """
         Set the connectivity.
         """
-        self.connectivity = connectivity
+        self.neighbor = neighbor
 
-    def get_connectivity(self):
+    def get_neighbor(self):
         """
         Get the connectivity.
         """
-        return self.connectivity
+        return self.neighbor
 
     def set_similarity_criteria(self, similarity_criteria):
         """
@@ -98,9 +94,6 @@ class SeededRegionGrowing:
         """
         Fixed threshold region growing.
         """
-        if len(self.seeds.coords.shape) == 1:
-            self.seeds.coords = np.array([self.seeds.coords])
-        start_point = self.seeds.coords[0]
 
         image_shape = self.target_image.shape
         if len(image_shape) == 4:
@@ -116,73 +109,77 @@ class SeededRegionGrowing:
 
         for i in range(self.seeds.coords.shape[0]):
             cur_region[tuple(self.seeds.coords[i])] = True
-            if not inside(np.array(tuple(start_point)), image_shape):
-                raise ValueError("The seed is out of the image range.")
 
-        threshold = self.stop_criteria.computing()
+        threshold = self.stop_criteria.computing
         while region_size <= threshold:
-            points = self.connectivity.computing(start_point, image_shape)
+            points = self.connectivity.computing
             for point in points:
                 if inside(point, image_shape) and not region_neighbor[tuple(point)] and not cur_region[tuple(point)]:
                     region_neighbor[tuple(point)] = True
             cur_region[tuple(start_point)] = True
             region_neighbor[tuple(start_point)] = False
-            start_point = self.similarity_criteria.computing(region, self.target_image)
+            start_point = self.similarity_criteria.computing
             region_size += 1
 
         return region
 
 
-class Seeds:
+class Seeds(object):
     """
     Seeds.
     """
     def __init__(self, coords):
         """
-        Init seeds.
         Parameters
         -----------------------------------------------------
-        seeds: a set of coordinates or a region mask
+        coords: tuple of tuple(((x1,y1,z1),(x2,y2,z2)),()). The out tuple indicates the number of group seeds, the inner
+          tuple indicates the number of voxels of each group of seeds
+
         """
-        if not isinstance(coords, np.ndarray):
-            raise ValueError("The value must be  a 1D/2D/3D!")
-        else:
-            self.coords = coords
+
+        self.coords = coords
 
     def generating(self):
         """
         Generating new seeds.
         """
-        return self.generating()
+        return self.coords
 
 
 class RandomSeeds(Seeds):
     """
     Random Seeds.
     """
-    def __init__(self, seeds, random_number=0):
+
+    def __init__(self, coords, sampling_number=10):
         """
         Init seeds.
         Parameters
         -----------------------------------------------------
-        seeds_type: 'separation', 'union', 'random'
         value: a set of coordinates or a region mask.
         """
-        Seeds.__init__(self, seeds)
+        super(RandomSeeds, self).__init__(coords)
 
-        if not isinstance(random_number, int):
+        if not isinstance(sampling_number, int):
             raise ValueError("The random_number must be int type.")
         else:
-            self.random_number = random_number
+            self.sampling_number = sampling_number
 
     def generating(self):
         """
         Generating new seeds.
+
+        return: sampling_coords: sample multiple times and sample a voxel from each group of seeds
+
         """
-        if self.random_number == 0:
-            return self.seeds.coords
-        else:
-            return random.sample(self.seeds.coords, self.random_number)
+        sampling_coords = []
+        for r in range(self.sampling_number):
+            single_sampling = []
+            for g in range(len(self.coords)):
+                single_sampling.append(random.choice(self.coords[g]))
+            sampling_coords.append(single_sampling)
+
+        return sampling_coords
 
 
 class SimilarityCriteria:
@@ -399,44 +396,9 @@ class StopCriteria(object):
         return self.threshold
 
 
-class Connectivity:
-    """
-    Pixel connectivity.
-    """
-    def __init__(self, name='8'):
-        """
-        Parameters
-        -----------------------------------------------------
-        name:for 2D ndarray, the name can be '4', '8'; for 3d ndarray, the name can be '6', '18', '26', default is '8'.
-        """
-        self.name = name
-
-    def set_name(self, name):
-        """
-        Get the name of the connectivity..
-        """
-        self.name = name
-
-    def get_name(self):
-        """
-        Get the name of the connectivity..
-        """
-        return self.name
-
-    def computing(self, point, image_shape):
-        """
-        Get the connectivity of the connectivity..
-        Parameters
-        -----------------------------------------------------
-        point: The point of the image, pixel or voxel.
-        image_shape: The shape of  input target image.
-        """
-        return point + compute_offsets(len(image_shape), int(self.name))
-
-
 class Region(object):
     """
-    Distance measure.
+    Region
     """
     def __init__(self, region_neighbor, cur_region):
         """
@@ -592,7 +554,7 @@ class AdaptiveSRG(SeededRegionGrowing):
         connectivity = Connectivity('26')
 
         region_sequence = []
-        child_vector = self.stop_criteria.computing()
+        child_vector = self.stop_criteria.computing
         for i in child_vector:
             stop_criteria_temp = StopCriteria(name='region_size', threshold=i)
             self.set_stop_criteria(stop_criteria_temp)
@@ -613,173 +575,18 @@ class RegionOptimize(Region):
         mask_image: the mask image may be used in the compute process. which should be a ndarray type.
         prior_image:the prior image may be used in the compute process. which should be a ndarray type.
         """
-        self.image = target_image
-        self.seeds = seeds
-        self.uplimit = upperlimit
-        self.connectivity = connectivity
-
-    def optimal_average_contrast(self):
-        """
-        return average contrast list.
-        """
-        seeds = self.seeds
-        image = self.image
-        Num = self.uplimit
-        connectivity = self.connectivity
-        x, y, z = seeds
-        image_shape = image.shape
-        if not inside(seeds, image_shape):
-            print "The seed is out of the image range."
-            return False
-
-        contrast = []
-        region_size = 1
-        origin_t = image[x, y, z]
-        inner_list = [origin_t]
-        tmp_image = np.zeros_like(image)
-
-        neighbor_free = 10000
-        neighbor_pos = -1
-        neighbor_list = np.zeros((neighbor_free, 4))
-
-        while region_size <= Num:
-            for i in range(int(connectivity)):
-                set0, set1, set2 = compute_offsets(len(image.shape), int(connectivity))[i]
-                xn, yn, zn = x + set0, y + set1, z + set2
-                if inside((xn, yn, zn), image_shape) and tmp_image[xn, yn, zn] == 0:
-                    neighbor_pos += 1
-                    neighbor_list[neighbor_pos] = [xn, yn, zn, image[xn, yn, zn]]
-                    tmp_image[xn, yn, zn] = 1
-
-            out_boundary = neighbor_list[np.nonzero(neighbor_list[:, 3]), 3]
-            contrast = contrast + [np.mean(np.array(inner_list)) - np.mean(out_boundary)]
-
-            tmp_image[x, y, z] = 2
-            region_size += 1
-
-            #if the length of neighbor_list is not enough,add another 10000
-            if neighbor_pos + 100 > neighbor_free:
-                neighbor_free += 10000
-                new_list = np.zeros((10000, 4))
-                neighbor_list = np.vstack((neighbor_list, new_list))
-
-            distance = np.abs(neighbor_list[:neighbor_pos + 1, 3] - np.tile(origin_t, neighbor_pos + 1))
-            index = distance.argmin()
-            x, y, z = neighbor_list[index][:3]
-            inner_list = inner_list + [image[x, y, z]]
-            neighbor_list[index] = neighbor_list[neighbor_pos]
-            neighbor_pos -= 1
-
-        ACB = []
-        region_sequence = AdaptiveSRG(image, seeds, Num, connectivity).grow()
-        for i in range(20, self.uplimit, 20):
-            ACB = ACB + [contrast[i]]
-        k = np.array(ACB).argmax()
-        print 20*(k+1)
-        return region_sequence[k]
-
-    def optimal_peripheral_contrast(self):
-        """
-        return average contrast list.
-        """
-        seeds = self.seeds
-        image = self.image
-        Num = self.uplimit
-        connectivity = self.connectivity
-        x, y, z = seeds
-        image_shape = image.shape
-        if not inside(seeds, image_shape):
-            print "The seed is out of the image range."
-            return False
-
-        contrast = []
-        region_size = 1
-        origin_t = image[x, y, z]
-        tmp_image = np.zeros_like(image)
-
-        default_space = 10000
-        outer_pos = -1
-        inner_pos = -1
-        inner_list = np.zeros((default_space, 4))
-        outer_boundary_list = np.zeros((default_space, 4))
-
-        while region_size <= Num:
-            inner_pos += 1
-            inner_list[inner_pos] = [x, y, z, image[x, y, z]]
-            for i in range(int(connectivity)):
-                set0, set1, set2 = compute_offsets(len(image.shape), int(connectivity))[i]
-                xn, yn, zn = x + set0, y + set1, z + set2
-                if inside((xn, yn, zn), image_shape) and tmp_image[xn, yn, zn] == 0:
-                    outer_pos += 1
-                    outer_boundary_list[outer_pos] = [xn, yn, zn, image[xn, yn, zn]]
-                    tmp_image[xn, yn, zn] = 1
-
-            outer_boundary = outer_boundary_list[np.nonzero(outer_boundary_list[:, 3]), 3]
-            inner_region_cor = inner_list[np.nonzero(inner_list[:, 3]), :3][0]
-            inner_boundary_cor = self.inner_boundary(tmp_image, np.array(inner_region_cor))
-
-            inner_boundary_val = []
-            if len(inner_boundary_cor.shape) == 1:
-                inner_boundary_val = inner_boundary_val + [image[inner_boundary_cor[0],
-                                                                 inner_boundary_cor[1], inner_boundary_cor[2]]]
-            else:
-                for i in inner_boundary_cor:
-                    inner_boundary_val = inner_boundary_val + [image[i[0], i[1], i[2]]]
-
-            contrast = contrast + [np.mean(inner_boundary_val) - np.mean(outer_boundary)]
-            tmp_image[x, y, z] = 2
-            region_size += 1
-
-            if outer_pos + 100 > default_space:
-                default_space += 10000
-                new_list = np.zeros((10000, 4))
-                outer_boundary_list = np.vstack((outer_boundary_list, new_list))
-
-            distance = np.abs(outer_boundary_list[:outer_pos + 1, 3] - np.tile(origin_t, outer_pos + 1))
-            index = distance.argmin()
-            x, y, z = outer_boundary_list[index][:3]
-
-            outer_boundary_list[index] = outer_boundary_list[outer_pos]
-            outer_pos -= 1
-
-        PCB = []
-        region_sequence = AdaptiveSRG(image, seeds, Num, connectivity).grow()
-        for i in range(20, self.uplimit, 20):
-            PCB = PCB + [contrast[i]]
-        k = np.array(PCB).argmax()
-        print 20*(k+1)
-        return region_sequence[k]
-
-    def is_neiflag(self, flag_image, coordinate, flag):
-        """
-        if coordinate has a neighbor with certain flag return True,else False.
-        """
-        x, y, z = coordinate
-        for j in range(self.connectivity):
-            set0, set1, set2 = self.get_connectivity()[j]
-            xn, yn, zn = x + set0, y + set1, z + set2
-            if flag_image[xn, yn, zn] == flag:
-                return True
-        return False
-
-    def inner_boundary(self, flag_image, inner_region_cor):
-        """
-        find the inner boundary of the region.
-        """
-        inner_b = []
-        for i in inner_region_cor:
-            if self.is_neiflag(flag_image, i, 1):
-                if inner_b == []:
-                    inner_b = i
-                else:
-                    inner_b= np.vstack((inner_b, i))
-        return np.array(inner_b)
-
-    def other_optimize(self):
-        """
-        Get the optimize region.
-        """
-        return self.optimize()
 
 
+if __name__ == "__main__":
+    seed_coors = (((1, 2, 3), (3, 2, 1)), ((4, 5, 6), (6, 5, 1)))
+    seeds3d = Seeds(seed_coors)
+    print seeds3d.generating()
+
+    randseeds = RandomSeeds(seed_coors)
+    print randseeds.generating()
+
+
+    #similarity_criteria = NeighborSimilarity(metric='euclidean',)
+    #stop_criteria = StopCriteria(name='region_size', threshold=300)
+    #connectivity = Connectivity('6')
 
