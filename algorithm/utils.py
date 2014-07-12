@@ -19,3 +19,28 @@ def is_inside(coors, image_shape):
                         coors[:, 2] >= 0, coors[:, 2] < image_shape[2]], axis=0)
 
 
+def intersect2d(A, B):
+    """
+    A,B: 2D numpy array
+    """
+    nrows, ncols = A.shape
+    dtype = {'names': ['f{}'.format(i) for i in range(ncols)], 'formats': ncols * [A.dtype]}
+
+    C = np.intersect1d(A.view(dtype), B.view(dtype))
+    C = C.view(A.dtype).reshape(-1, ncols)
+
+    return C
+
+
+def in2d(A, B):
+    """
+    A,B: 2D numpy array
+    Return a boolean array the same length as A that is true where an element of A is in B and False otherwise
+    """
+    nrows, ncols = A.shape
+    dtype = {'names': ['f{}'.format(i) for i in range(ncols)], 'formats': ncols * [A.dtype]}
+
+    C = np.in1d(A.view(dtype), B.view(dtype))
+
+    return C
+
