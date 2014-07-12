@@ -6,143 +6,6 @@ from scipy.spatial import distance
 import utils
 
 
-class SeededRegionGrowing:
-    """
-    Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeds.
-
-
-    Attributes
-    ----------
-    image: numpy 2d/3d/4d array
-        The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first three dimension is spatial dimension and
-        the fourth dimension is time or feature dimension
-    seeds: class Seeds
-        The seeds at which region growing begin
-    similarity_criteria: class SimilarityCriteria
-        The similarity criteria which control the neighbor to merge to the region
-    stop_criteria: class StopCriteria
-        The stop criteria which control when the region growing stop
-    neighbor:class SpatialNeighbor
-        The neighbor generator which generate the spatial neighbor(coordinates)for a point
-
-    Methods
-    -------
-    grow()
-        do region growing
-
-    """
-
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor):
-        """
-        Initialize the object
-
-        Parameters
-        ----------
-        image: numpy.array
-            a 2d/3d/4d image to be segmentated
-        seeds: class Seeds
-            The seeds at which region growing begin
-        similarity_criteria: class SimilarityCriteria
-            The similarity criteria which control the neighbor to merge to the region
-        stop_criteria: class StopCriteria
-            The stop criteria which control when the region growing stop
-        neighbor:class SpatialNeighbor
-            The neighbor generator which generate the spatial neighbor(coordinates)for a point
-
-        """
-
-        if 2 <= len(image.shape) <= 4:
-            self.image = image
-        else:
-            raise ValueError("Target image must be a 2D/3D/4D array.")
-
-        self.seeds = seeds
-        self.similarity_criteria = similarity_criteria
-        self.stop_criteria = stop_criteria
-        self.neighbor = neighbor
-
-        region_label = np.array(self.seeds.coords)
-        region_neighbor = self.neighbor.compute(self.seeds.coords)
-        self.region = Region(region_label, region_neighbor)
-
-    def set_image(self, image):
-        self.image = image
-
-    def get_image(self):
-        return self.image
-
-    def set_seeds(self, seeds):
-        self.seeds = seeds
-
-    def get_seeds(self):
-        return self.seeds
-
-    def set_stop_criteria(self, stop_criteria):
-        """
-        Set the stop criteria.
-        """
-        self.stop_criteria = stop_criteria
-
-    def get_stop_criteria(self):
-        """
-        Return the stop criteria.
-        """
-        return self.stop_criteria
-
-    def set_neighbor(self, neighbor):
-        """
-        Set the connectivity.
-        """
-        self.neighbor = neighbor
-
-    def get_neighbor(self):
-        """
-        Get the connectivity.
-        """
-        return self.neighbor
-
-    def set_similarity_criteria(self, similarity_criteria):
-        """
-        Set the similarity criteria.
-        """
-        self.similarity_criteria = similarity_criteria
-
-    def get_similarity_criteria(self):
-        """
-        Get the similarity criteria.
-        """
-        return self.similarity_criteria
-
-    def set_region(self, region):
-        """
-        Set the region sequence.
-        """
-        self.region = region
-
-    def get_region(self):
-        """
-        Get the region sequence..
-        """
-        return self.region
-
-    def grow(self):
-        """
-        Do region growing based on the attributes seeds,similarity and stop criterion
-
-        """
-
-        while not self.stop_criteria.isstop():
-            nearest_neighbor = self.similarity_criteria.compute(self.region, self.image)
-
-            self.region.add_label(nearest_neighbor)
-
-            self.region.remove_neighbor(nearest_neighbor)
-
-            self.region.add_neighbor(self.neighbor.compute(nearest_neighbor))
-
-            self.stop_criteria.compute(self.region, self.image)
-        return self.region
-
 
 class Seeds(object):
     """
@@ -154,7 +17,7 @@ class Seeds(object):
         The element of the list is a series tuples, which in turn is a series of tuple,
         each holding the coordinates of a point
     sampling_number: int
-        It provides the sampling number.
+        The sampling number for random sampling
 
     """
 
@@ -164,9 +27,10 @@ class Seeds(object):
         Parameters
         ----------
         coords: list of tuple coordinates [((x1,y1,z1),(x2,y2,z2)),()]
-        The element of the list is a series tuples, which in turn is a series of tuple,
-        each holding the coordinates of a point
-
+            The element of the list is a series tuples, which in turn is a series of tuple,
+            each holding the coordinates of a point
+        sampling_number: int
+            the sampling number for random sampling.
 
         """
 
@@ -215,7 +79,7 @@ class SimilarityCriteria:
     Methods
     ------
     compute()
-    Do computing the similarity between the labeled region and its neighbors
+        Do computing the similarity between the labeled region and its neighbors
 
 
     """
@@ -495,6 +359,144 @@ def compute_external_boundary(self):
     """
     #Do something here.
     pass
+
+
+class SeededRegionGrowing:
+    """
+    Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeds.
+
+
+    Attributes
+    ----------
+    image: numpy 2d/3d/4d array
+        The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first three dimension is spatial dimension and
+        the fourth dimension is time or feature dimension
+    seeds: class Seeds
+        The seeds at which region growing begin
+    similarity_criteria: class SimilarityCriteria
+        The similarity criteria which control the neighbor to merge to the region
+    stop_criteria: class StopCriteria
+        The stop criteria which control when the region growing stop
+    neighbor:class SpatialNeighbor
+        The neighbor generator which generate the spatial neighbor(coordinates)for a point
+
+    Methods
+    -------
+    grow()
+        do region growing
+
+    """
+
+    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor):
+        """
+        Initialize the object
+
+        Parameters
+        ----------
+        image: numpy.array
+            a 2d/3d/4d image to be segmentated
+        seeds: class Seeds
+            The seeds at which region growing begin
+        similarity_criteria: class SimilarityCriteria
+            The similarity criteria which control the neighbor to merge to the region
+        stop_criteria: class StopCriteria
+            The stop criteria which control when the region growing stop
+        neighbor:class SpatialNeighbor
+            The neighbor generator which generate the spatial neighbor(coordinates)for a point
+
+        """
+
+        if 2 <= len(image.shape) <= 4:
+            self.image = image
+        else:
+            raise ValueError("Target image must be a 2D/3D/4D array.")
+
+        self.seeds = seeds
+        self.similarity_criteria = similarity_criteria
+        self.stop_criteria = stop_criteria
+        self.neighbor = neighbor
+
+        region_label = np.array(self.seeds.coords)
+        region_neighbor = self.neighbor.compute(self.seeds.coords)
+        self.region = Region(region_label, region_neighbor)
+
+    def set_image(self, image):
+        self.image = image
+
+    def get_image(self):
+        return self.image
+
+    def set_seeds(self, seeds):
+        self.seeds = seeds
+
+    def get_seeds(self):
+        return self.seeds
+
+    def set_stop_criteria(self, stop_criteria):
+        """
+        Set the stop criteria.
+        """
+        self.stop_criteria = stop_criteria
+
+    def get_stop_criteria(self):
+        """
+        Return the stop criteria.
+        """
+        return self.stop_criteria
+
+    def set_neighbor(self, neighbor):
+        """
+        Set the connectivity.
+        """
+        self.neighbor = neighbor
+
+    def get_neighbor(self):
+        """
+        Get the connectivity.
+        """
+        return self.neighbor
+
+    def set_similarity_criteria(self, similarity_criteria):
+        """
+        Set the similarity criteria.
+        """
+        self.similarity_criteria = similarity_criteria
+
+    def get_similarity_criteria(self):
+        """
+        Get the similarity criteria.
+        """
+        return self.similarity_criteria
+
+    def set_region(self, region):
+        """
+        Set the region sequence.
+        """
+        self.region = region
+
+    def get_region(self):
+        """
+        Get the region sequence..
+        """
+        return self.region
+
+    def grow(self):
+        """
+        Do region growing based on the attributes seeds,similarity and stop criterion
+
+        """
+
+        while not self.stop_criteria.isstop():
+            nearest_neighbor = self.similarity_criteria.compute(self.region, self.image)
+
+            self.region.add_label(nearest_neighbor)
+
+            self.region.remove_neighbor(nearest_neighbor)
+
+            self.region.add_neighbor(self.neighbor.compute(nearest_neighbor))
+
+            self.stop_criteria.compute(self.region, self.image)
+        return self.region
 
 
 class Optimizer(object):
