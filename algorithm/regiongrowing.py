@@ -1,7 +1,6 @@
 import random
 
 import numpy as np
-import nibabel as nib
 from scipy.spatial import distance
 
 import utils
@@ -16,32 +15,25 @@ class SeededRegionGrowing:
         """
         Parameters
         -----------------------------------------------------
-        image: input image, a 2D/3D/4D Nifti1Image object or N-D array
+        image: input image, a 2D/3D/4D array
         seeds: an instance of class Seed
         similarity_criteria: an instance of class SimilarityCriteria
         stop_criteria: an instance of class StopCriteria
-        neighbor: an instance of class Connectivity(SpatialNeighbor)
+        neighbor: an instance of class SpatialNeighbor
         """
 
-        if isinstance(image, nib.nifti1.Nifti1Image):
-            target_image = image.get_data()
-
         if 2 <= len(image.shape) <= 4:
-            self.image = target_image
+            self.image = image
         else:
-            raise ValueError("Target image must be a 2D/3D/4D.")
+            raise ValueError("Target image must be a 2D/3D/4D array.")
 
         self.seeds = seeds
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
         self.neighbor = neighbor
 
-        region_label = self.seeds
-        region_neighbor = []
-        for i in range(len(self.seeds.coords)):
-            for j in range(len(self.seeds.coords[i])):
-                region_neighbor = self.neighbor(self.seeds.coords)
-
+        region_label = np.array(self.seeds.coords)
+        region_neighbor = self.neighbor.compute(self.seeds.coords)
         self.region = Region(region_label, region_neighbor)
 
 
@@ -112,13 +104,15 @@ class SeededRegionGrowing:
         """
 
         while not self.stop_criteria.isstop():
-            nearest_neighbor = self.similarity_criteria.compute(self.region, self.image)
+            nearest_neighbor = self.similarity_criteria.compute(self.image, self.region)
+
             self.region.add_label(nearest_neighbor)
 
             self.region.remove_neighbor(nearest_neighbor)
+
             self.region.add_neighbor(self.neighbor.compute(nearest_neighbor))
 
-            self.stop_criteria.compute(self.region, self.image)
+            self.stop_criteria.compute(self.image, self.region)
         return self.region
 
 
@@ -208,7 +202,7 @@ class SimilarityCriteria:
         """
         return self.metric
 
-    def compute(self, region, image=None, mask_image=None, prior_image=None):
+    def compute(self, image, region, mask_image=None, prior_image=None):
         """
         Compute the similarity between the labeled region and neighbors.
 
@@ -219,13 +213,26 @@ class SimilarityCriteria:
         mask_image: the mask image may be used in the compute process. which should be a ndarray.
         prior_image:the prior image may be used in the compute process. which should be a ndarray.
         """
+
         lsize = region.label_size
         nsize = region.neighbor_size
-        region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
-        neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2], :]
-        dist = distance.cdist(region_val, neighbor_val, self.metric)
-        index = dist.argmin()
 
+        if image.ndim == 2:
+            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
+            neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1]]
+            dist = np.abs(region_val - neighbor_val)
+
+        elif image.ndim == 3:
+            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
+            neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2]]
+            dist = np.abs(region_val - neighbor_val)
+
+        else:
+            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
+            neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2], :]
+            dist = distance.cdist(region_val, neighbor_val, self.metric)
+
+        index = dist.argmin()
         return region.neighbor[index, :]
 
 
@@ -234,8 +241,7 @@ class StopCriteria(object):
     Stop criteria.
     """
 
-    def __init__(self, target_image, region, criterion_type='morphlogy', criterion_metric='region_size',
-                 threshold=None):
+    def __init__(self, threshold=None, criteria_metric='size'):
         """
         Parameters
         -----------------------------------------------------
@@ -243,8 +249,7 @@ class StopCriteria(object):
         threshold: a int value or None, default is None which means the adaptive method will be used.
         """
 
-        self.type = criterion_type
-        self.metric = criterion_metric
+        self.metric = criteria_metric
         self.threshold = threshold
         self.stop = False
 
@@ -261,17 +266,16 @@ class StopCriteria(object):
         return self.metric
 
 
-    def compute(self, region, raw_image=None, mask_image=None, prior_image=None):
+    def compute(self, image, region, mask_image=None, prior_image=None):
         """
 
         check whether growing should stop according to the region and image
 
         """
 
-        if self.type == 'morphology':
-            if self.metric == 'region_size':
-                if region.shape[0] >= self.threshold:
-                    self.stop = True
+        if self.metric == 'size':
+            if region.label_size > self.threshold:
+                self.stop = True
 
     def isstop(self):
         return self.stop
@@ -296,8 +300,8 @@ class Region(object):
             raise ValueError("The neighbor of the Region class must be ndarray type. ")
 
         buffer_size = 10000
-        self.label = np.zeros((buffer_size, 4))
-        self.neighbor = np.zeros(buffer_size, 4)
+        self.label = np.zeros((buffer_size, 3), dtype=int)
+        self.neighbor = np.zeros((buffer_size, 3), dtype=int)
 
         self.label_size = region_label.shape[0]
         self.label[:self.label_size, :] = region_label
@@ -332,40 +336,44 @@ class Region(object):
 
     def add_label(self, new_label):
 
-        self.label[self.label_size:(self.label_size + new_label.shape[0]), :] = new_label
-        self.label_size = self.label_size + new_label.shape[0]
-
+        self.label[self.label_size, :] = new_label
+        self.label_size += 1
 
     def add_neighbor(self, new_neighbor):
 
-        marked = utils.in2d(new_neighbor, self.neighbor[:self.neighbor_size, :]) \
-            or utils.in2d(new_neighbor, self.label[:, self.label_size, :])
-        np.delete(new_neighbor, marked, 0)
+        # print utils.in2d(new_neighbor, self.neighbor[:self.neighbor_size, :])
+        marked = np.logical_or(utils.in2d(new_neighbor, self.neighbor[:self.neighbor_size, :]),
+                               utils.in2d(new_neighbor, self.label[:self.label_size, :]))
+
+        new_neighbor = np.delete(new_neighbor, np.nonzero(marked), axis=0)
+
+        # print new_neighbor
 
         self.neighbor[self.neighbor_size:(self.neighbor_size + new_neighbor.shape[0]), :] = new_neighbor
         self.neighbor_size = self.neighbor_size + new_neighbor.shape[0]
 
     def remove_neighbor(self, new_label):
 
-        idx = np.nonzero(utils.in2d(self.neighbor[:self.neighbor_size, :], new_label))
-        np.delete(self.neighbor, idx, 0)
-        self.neighbor_size = self.neighbor_size - idx.shape[0]
+        idx = np.nonzero(utils.in2d(self.neighbor[:self.neighbor_size, :], new_label))[0]
+        self.neighbor = np.delete(self.neighbor, idx, 0)
+        self.neighbor_size -= len(idx)
 
 
 def compute_inner_boundary(self):
     """
         Compute the inner boundary
-        """
-        #Do something here.
-        pass
+    """
+    #Do something here.
+
+    pass
 
 
 def compute_external_boundary(self):
     """
         Compute the external boundary
-        """
-        #Do something here.
-        pass
+    """
+    #Do something here.
+    pass
 
 
 class Optimizer(object):
@@ -401,7 +409,7 @@ class Aggregator(object):
         pass
 
 
-    def compute(self, ):
+    def compute(self):
         """
         Aggregation for different regions
         """
@@ -434,8 +442,9 @@ class AdaptiveSRG(SeededRegionGrowing):
     Adaptive seeded region growing.
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor, ):
+    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor, optimizer):
         super(AdaptiveSRG, self).__init__(image, seeds, similarity_criteria, stop_criteria, neighbor)
+        self.optimizer = optimizer
 
 
     def grow(self):
