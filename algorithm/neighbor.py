@@ -5,7 +5,6 @@
 Generate neighbor for a refer point.
 
 """
-
 import numpy as np
 
 
@@ -23,18 +22,17 @@ class SpatialNeighbor(object):
     
     """
 
-    def __init__(self, img_shape, nb_size, ref_point):
+    def __init__(self, img_shape, nb_size):
         if len(img_shape) == 2 or len(img_shape) == 3:
             self.img_shape = img_shape
             self.nb_size = nb_size
-            self.ref = ref_point
 
         else:
             raise ValueError("The image dimension should be 2 or 3")
 
 
-    def compute(self):
-        return self.computing()
+    def compute(self, ref):
+        return self.computing(ref)
 
 
 class Connectivity(SpatialNeighbor):
@@ -51,13 +49,13 @@ class Connectivity(SpatialNeighbor):
     
     """
 
-    def __init__(self, img_shape, nb_size, ref_point):
+    def __init__(self, img_shape, nb_size):
 
         """
 
         :rtype : object
         """
-        super(Connectivity, self).__init__(img_shape, nb_size, ref_point)
+        super(Connectivity, self).__init__(img_shape, nb_size)
 
         offsets = []
         if len(self.img_shape) == 2:  # 2D image 4, 6, 8-connected
@@ -99,9 +97,8 @@ class Connectivity(SpatialNeighbor):
 
         self.offsets = offsets
 
-
-    def computing(self):
-        coors = self.ref + self.offsets
+    def computing(self, ref):
+        coors = ref + self.offsets
         return coors[is_in_image(coors, self.img_shape), :]
 
 
@@ -115,10 +112,9 @@ class Sphere(SpatialNeighbor):
     
     """
 
+    def __init__(self, img_shape, nb_size):
 
-    def __init__(self, img_shape, nb_size, ref_point, ):
-
-        super(Sphere, self).__init__(img_shape, nb_size, ref_point)
+        super(Sphere, self).__init__(img_shape, nb_size)
 
         offsets = []
         if len(self.img_shape) == 2:
@@ -136,9 +132,8 @@ class Sphere(SpatialNeighbor):
 
         self.offsets = offsets
 
-
-    def computing(self):
-        coors = self.ref + np.array(self.offsets)
+    def computing(self, ref):
+        coors = ref + np.array(self.offsets)
         return coors[is_in_image(coors, self.img_shape), :]
 
 
@@ -152,8 +147,8 @@ class Cube(SpatialNeighbor):
     
     """
 
-    def __init__(self, img_shape, nb_size, ref_points, ):
-        super(Cube, self).__init__(img_shape, nb_size, ref_points)
+    def __init__(self, img_shape, nb_size):
+        super(Cube, self).__init__(img_shape, nb_size)
 
         offsets = []
         if len(self.img_shape) == 2:
@@ -169,9 +164,8 @@ class Cube(SpatialNeighbor):
 
         self.offsets = offsets
 
-
-    def computing(self):
-        coors = self.ref + np.array(self.offsets)
+    def computing(self, ref):
+        coors = ref + np.array(self.offsets)
         return coors[is_in_image(coors, self.img_shape), :]
 
 
@@ -194,14 +188,14 @@ def is_in_image(coors, image_shape):
 
 
 if __name__ == "__main__":
-    conn = Connectivity((20, 20, 20), 26, (20, 15, 15))
-    print 'Connectivity\n', conn.compute()
+    conn = Connectivity((20, 20, 20), 26)
+    print 'Connectivity\n', conn.compute((20, 15, 15))
 
-    sph = Sphere((20, 20, 20), 3, (20, 19, 18))
-    print 'Sphere\n', sph.compute()
+    sph = Sphere((20, 20, 20), 3)
+    print 'Sphere\n', sph.compute((20, 19, 18))
 
-    cube = Cube((20, 20, 20), 3, (20, 19, 18))
-    print 'Cube\n', cube.compute()
+    cube = Cube((20, 20, 20), 3)
+    print 'Cube\n', cube.compute((20, 19, 18))
 
 
 
