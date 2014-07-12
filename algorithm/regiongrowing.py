@@ -8,7 +8,28 @@ import utils
 
 class SeededRegionGrowing:
     """
-    Seeded region growing with a fixed threshold.
+    Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeds.
+
+
+    Attributes
+    ----------
+    image: numpy 2d/3d/4d array
+        numpy array to represent 2d/3d/4d image. In 4d image, the first three dimension is spatial dimension and
+        the fourth dimension is time or feature dimension
+    seeds: class Seeds
+        The seeds at which region growing begin
+    similarity_criteria: class SimilarityCriteria
+        The similarity criteria which control the neighbor to merge to the region
+    stop_criteria: class StopCriteria
+        The stop criteria which control when the region growing stop
+    neighbor:class SpatialNeighbor
+        The neighbor generator which generate the spatial neighbor(coordinates)for a point
+
+    Methods
+    -------
+    grow()
+        do region growing
+
     """
 
     def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor):
