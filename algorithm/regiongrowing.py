@@ -6,7 +6,6 @@ from scipy.spatial import distance
 import utils
 
 
-
 class Seeds(object):
     """
     An object hold the coordinates of the seeded points and randomly sample the points
@@ -78,7 +77,7 @@ class SimilarityCriteria:
 
     Methods
     ------
-    compute()
+    compute(region, image, prior_image=None)
         Do computing the similarity between the labeled region and its neighbors
 
 
@@ -246,7 +245,7 @@ class Region(object):
         ----------
         label: numpy 2d array
             Each row represents the coordinates for a pixels. Number of the rows is the number of pixels
-        neighbor:numpy 2d array
+        neighbor: numpy 2d array
             Each row represents the coordinates for a pixels
 
         """
@@ -258,8 +257,8 @@ class Region(object):
             raise ValueError("The neighbor of the Region class must be ndarray type. ")
 
         buffer_size = 10000
-        self.label = np.zeros((buffer_size, 3), dtype=int)
-        self.neighbor = np.zeros((buffer_size, 3), dtype=int)
+        self.label = np.zeros((buffer_size, label.shape[1]), dtype=int)
+        self.neighbor = np.zeros((buffer_size, label.shape[1]), dtype=int)
 
         self.label_size = label.shape[0]
         self.label[:self.label_size, :] = label
@@ -273,26 +272,26 @@ class Region(object):
         set the coordinates of the labeled pixes
         """
 
-        self.label = label
+        self.label[:label.shape[0], :] = label
 
     def get_label(self):
         """
         Get the the coordinates of the labeled pixels
         """
 
-        return self.label
+        return self.label[:self.label_size, :]
 
     def set_neighbor(self, neighbor):
         """
         Set the coordinates of region neighbor.
         """
-        self.neighbor = neighbor
+        self.neighbor[:neighbor.shape[0], :] = neighbor
 
     def get_neighbor(self):
         """
         Get the coordinates of region neighbor.
         """
-        return self.neighbor
+        return self.neighbor[:self.neighbor_size, :]
 
     def add_label(self, label):
         """
@@ -317,14 +316,13 @@ class Region(object):
             Each row represents the coordinates for  a pixels
         """
 
-        self.neighbor = neighbor
-        # print utils.in2d(new_neighbor, self.neighbor[:self.neighbor_size, :])
+        #print utils.in2d(new_neighbor, self.neighbor[:self.neighbor_size, :])
         marked = np.logical_or(utils.in2d(neighbor, self.neighbor[:self.neighbor_size, :]),
                                utils.in2d(neighbor, self.label[:self.label_size, :]))
 
         neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
 
-        # print new_neighbor
+        #print neighbor
 
         self.neighbor[self.neighbor_size:(self.neighbor_size + neighbor.shape[0]), :] = neighbor
         self.neighbor_size = self.neighbor_size + neighbor.shape[0]
@@ -482,7 +480,7 @@ class SeededRegionGrowing:
 
     def grow(self):
         """
-        Do region growing based on the attributes seeds,similarity and stop criterion
+         Region grows based on the attributes seeds,similarity and stop criterion
 
         """
 
