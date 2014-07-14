@@ -7,6 +7,8 @@ Neighbor Generator for a set of refer points(pixels or voxels).
 """
 import numpy as np
 
+import utils
+
 
 class SpatialNeighbor(object):
     """Define spatial neighbor for a region which consists of of points(pixels or voxels).
@@ -23,7 +25,7 @@ class SpatialNeighbor(object):
         The spatial shape of the target image(e.g.,(64,64,32))
     """
 
-    def __init__(self, neighbor_type, neighbor_size, image_shape):
+    def __init__(self, neighbor_type, image_shape, neighbor_size):
         """
 
         Parameters
@@ -33,7 +35,7 @@ class SpatialNeighbor(object):
         neighbor_size: int
             The size of neighbor for a points(e.g. 26)
         image_shape: int
-            The spatial dimension of the target image(e.g.,2 or 3)
+            The spatial shape of the target image(e.g.,2 or 3)
         """
 
         if len(image_shape) == 2 or len(image_shape) == 3:
@@ -96,8 +98,6 @@ class SpatialNeighbor(object):
                             if np.linalg.norm([x, y, z]) <= self.neighbor_size:
                                 offsets.append([x, y, z])
 
-            offsets = np.array(offsets)
-
         elif neighbor_type == 'cube':
             if len(self.image_shape) == 2:
                 for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
@@ -130,12 +130,13 @@ class SpatialNeighbor(object):
         if not isinstance(refs, np.ndarray):
             refs = np.array(refs)
 
-        coords = np.zeros(self.offsets.shape[0] * refs.shape[0], refs.shape[1], dtype=int)
-        for r in range(self.offsets.shape[0] * refs.shape[0]):
+        coords = np.zeros((self.offsets.shape[0] * refs.shape[0], refs.shape[1]), dtype=int)
+        for r in range(refs.shape[0]):
             coords[r * self.offsets.shape[0]:(r + 1) * self.offsets.shape[0], :] = refs[r, :] + self.offsets
 
         coords = coords[is_in_image(coords, self.image_shape), :]
-        return coords
+
+        return utils.unique2d(coords)
 
 
 def is_in_image(coors, image_shape):
@@ -162,8 +163,8 @@ def is_in_image(coors, image_shape):
 
 
 if __name__ == "__main__":
-    nb = SpatialNeighbor('connected', 26, (20, 20, 20))
-    print nb.compute((20, 15, 15))
+    nb = SpatialNeighbor('connected', (20, 20, 20), 26)
+    print nb.compute([(20, 15, 15), (18, 16, 15)]).shape
 
 
 

@@ -8,13 +8,12 @@ import utils
 
 class Seeds(object):
     """
-    An object hold the coordinates of the seeded points and randomly sample the points
+    An object hold the coordinates of seeded points and randomly sample the points
 
     Attributes
     ----------
-    coords: list of tuple coordinates [((x1,y1,z1),(x2,y2,z2)),()]
-        The element of the list is a series tuples, which in turn is a series of tuple,
-        each holding the coordinates of a point
+    coords: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),]
+        The element of the list is a series tuples, each of which in turn holds the coordinates of a point
     sampling_number: int
         The sampling number for random sampling
 
@@ -25,9 +24,8 @@ class Seeds(object):
 
         Parameters
         ----------
-        coords: list of tuple coordinates [((x1,y1,z1),(x2,y2,z2)),()]
-            The element of the list is a series tuples, which in turn is a series of tuple,
-            each holding the coordinates of a point
+        coords: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),()]
+            The element of the list is a series tuples, which in turn holds the coordinates of a point
         sampling_number: int
             the sampling number for random sampling.
 
@@ -68,12 +66,10 @@ class SimilarityCriteria:
     """
     The object to compute the similarity between the labeled region and its neighbors
 
-
     Attributes
     ----------
     metric: str,optional
     A description for the metric type
-
 
     Methods
     ------
@@ -108,7 +104,7 @@ class SimilarityCriteria:
 
     def compute(self, region, image, prior_image=None):
         """
-        Compute the similarity between the labeled region and neighbors.
+        Compute the similarity between the labeled region and its neighbors.
 
         Parameters
         ----------
@@ -316,20 +312,20 @@ class Region(object):
             Each row represents the coordinates for  a pixels
         """
 
-        #print utils.in2d(new_neighbor, self.neighbor[:self.neighbor_size, :])
+        # find the neighbor which have been in neighbor or in label list
         marked = np.logical_or(utils.in2d(neighbor, self.neighbor[:self.neighbor_size, :]),
                                utils.in2d(neighbor, self.label[:self.label_size, :]))
 
+        # delete the marked neighbor
         neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
 
-        #print neighbor
-
+        # Add unmarked neighbor to the region neighbor and update the neighbor size
         self.neighbor[self.neighbor_size:(self.neighbor_size + neighbor.shape[0]), :] = neighbor
         self.neighbor_size = self.neighbor_size + neighbor.shape[0]
 
     def remove_neighbor(self, label):
         """
-        Remove the coordinates of new label from the neighbor of region.
+        Remove the coordinates of label from the neighbor of region.
 
         Parameters
         ----------
@@ -337,6 +333,7 @@ class Region(object):
             Each row represents the coordinates for a pixels
          """
 
+        # find the index of the new added labels in the region neighbor list
         idx = np.nonzero(utils.in2d(self.neighbor[:self.neighbor_size, :], label))[0]
         self.neighbor = np.delete(self.neighbor, idx, 0)
         self.neighbor_size -= len(idx)
@@ -415,6 +412,8 @@ class SeededRegionGrowing:
         self.neighbor = neighbor
 
         region_label = np.array(self.seeds.coords)
+
+        # compute the neighbor for the current region
         region_neighbor = self.neighbor.compute(self.seeds.coords)
         self.region = Region(region_label, region_neighbor)
 
@@ -485,14 +484,19 @@ class SeededRegionGrowing:
         """
 
         while not self.stop_criteria.isstop():
+            # find the nearest neighbor for the current region
             nearest_neighbor = self.similarity_criteria.compute(self.region, self.image)
 
+            # add the nearest neighbor to the region
             self.region.add_label(nearest_neighbor)
 
+            # remove the nearest neighbor from the current neighbor
             self.region.remove_neighbor(nearest_neighbor)
 
-            self.region.add_neighbor(self.neighbor.compute(nearest_neighbor))
+            # compute the neighbor of the new added voxels and put it into the current neighbor
+            self.region.add_neighbor(self.neighbor.compute([nearest_neighbor, ]))
 
+            # Update the stop criteria
             self.stop_criteria.compute(self.region, self.image)
         return self.region
 
@@ -575,12 +579,7 @@ class AdaptiveSRG(SeededRegionGrowing):
 
 
 if __name__ == "__main__":
-    seed_coors = (((1, 2, 3), (3, 2, 1)), ((4, 5, 6), (6, 5, 1)))
-    seeds3d = Seeds(seed_coors)
-    print seeds3d.generating()
-
-
-    #similarity_criteria = NeighborSimilarity(metric='euclidean',)
-    #stop_criteria = StopCriteria(name='region_size', threshold=300)
-    #connectivity = Connectivity('6')
+    seed_coords = (((1, 2, 3), (3, 2, 1)), ((4, 5, 6), (6, 5, 1)))
+    seeds3d = Seeds(seed_coords)
+    print seeds3d.get_coords()
 
