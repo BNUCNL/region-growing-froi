@@ -15,171 +15,127 @@ class SpatialNeighbor(object):
     ----------
     offsets: 2d numpy array(Nx2 or Nx3)
         Each row represents a relative offset to the ref points
-    image_dims: int
-        The spatial dimension of the target image(e.g.,2 or 3)
+    neighbor_type: str
+        Type for the neighbors. Supported types include 'connected', 'sphere', and 'cube'
     neighbor_size: int
         The size of neighbor for a points(e.g. 26)
-
+     image_shape: tuple or list
+        The spatial shape of the target image(e.g.,(64,64,32))
     """
 
-    def __init__(self, image_dims, neighbor_size):
+    def __init__(self, neighbor_type, neighbor_size, image_shape):
         """
 
         Parameters
         ----------
-        image_dims: int
-            The spatial dimension of the target image(e.g.,2 or 3)
+        neighbor_type: str
+            Type for the neighbors. Supported types include 'connected', 'sphere', and 'cube'
         neighbor_size: int
             The size of neighbor for a points(e.g. 26)
-
+        image_shape: int
+            The spatial dimension of the target image(e.g.,2 or 3)
         """
 
-        if len(image_dims) == 2 or len(image_dims) == 3:
-            self.image_dims = image_dims
+        if len(image_shape) == 2 or len(image_shape) == 3:
+            self.image_shape = image_shape
             self.neighbor_size = neighbor_size
+
+        else:
+            raise ValueError("The spatial dimension of image should be 2 or 3")
+
+        offsets = []
+        if neighbor_type == 'connected':
+            if len(self.image_shape) == 2:  # 2D image 4, 6, 8-connected
+                if self.neighbor_size == 4:
+                    offsets = [[1, 0], [-1, 0],
+                               [0, 1], [0, -1]]
+                elif self.neighbor_size == 6:
+                    offsets = [[1, 0], [-1, 0],
+                               [0, 1], [0, -1],
+                               [1, 1], [-1, -1]]
+                elif self.neighbor_size == 8:
+                    offsets = [[1, 0], [-1, 0],
+                               [0, 1], [0, -1],
+                               [1, 1], [-1, -1],
+                               [1, -1], [-1, 1]]
+            elif len(self.image_shape) == 3:  # 3D volume 6, 18, 26-connected
+                if self.neighbor_size == 6:
+                    offsets = [[1, 0, 0], [-1, 0, 0],
+                               [0, 1, 0], [0, -1, 0],
+                               [0, 0, -1], [0, 0, -1]]
+                elif self.neighbor_size == 18:
+                    offsets = [[0, -1, -1], [-1, 0, -1], [0, 0, -1],
+                               [1, 0, -1], [0, 1, -1], [-1, -1, 0],
+                               [0, -1, 0], [1, -1, 0], [-1, 0, 0],
+                               [1, 0, 0], [-1, 1, 0], [0, 1, 0],
+                               [1, 1, 0], [0, -1, 1], [-1, 0, 1],
+                               [0, 0, 1], [1, 0, 1], [0, 1, 1]]
+
+                elif self.neighbor_size == 26:
+                    offsets = [[-1, -1, -1], [0, -1, -1], [1, -1, -1],
+                               [-1, 0, -1], [0, 0, -1], [1, 0, -1],
+                               [-1, 1, -1], [0, 1, -1], [1, 1, -1],
+                               [-1, -1, 0], [0, -1, 0], [1, -1, 0],
+                               [-1, 0, 0], [1, 0, 0], [-1, 1, 0],
+                               [0, 1, 0], [1, 1, 0], [-1, -1, 1],
+                               [0, -1, 1], [1, -1, 1], [-1, 0, 1],
+                               [0, 0, 1], [1, 0, 1], [-1, 1, 1],
+                               [0, 1, 1], [1, 1, 1]]
+
+        elif neighbor_type == 'sphere':
+            if len(self.image_shape) == 2:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        if np.linalg.norm([x, y]) <= self.neighbor_size:
+                            offsets.append([x, y])
+
+            elif len(self.image_shape) == 3:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                            if np.linalg.norm([x, y, z]) <= self.neighbor_size:
+                                offsets.append([x, y, z])
+
+            offsets = np.array(offsets)
+
+        elif neighbor_type == 'cube':
+            if len(self.image_shape) == 2:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        offsets.append([x, y])
+
+            elif len(self.image_shape) == 3:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                            offsets.append([x, y, z])
 
         else:
             raise ValueError("The image dimension should be 2 or 3")
 
-
-    def compute(self, ref):
-        return self.computing(ref)
+        self.offsets = np.array(offsets)
 
 
-class Connectivity(SpatialNeighbor):
-    """
-
-    Define neighbors which are at least connected with a ref point.
-
-    """
-
-    def __init__(self, image_dims, neighbor_size):
-
+    def compute(self, refs):
         """
+        compute the neighbor for a region(i.e., a set of pixes or voxels)
 
         Parameters
         ----------
-        image_dims: int
-            The spatial dimension of the target image(e.g.,2 or 3)
-        neighbor_size: int
-            The size of neighbor for a points(e.g. 26)
+        refs: list, tuple or numpy 2d array
+            Each row represents the coordinates for a ref point
+
         """
 
-        super(Connectivity, self).__init__(image_dims, neighbor_size)
+        if not isinstance(refs, np.ndarray):
+            refs = np.array(refs)
 
-        offsets = []
-        if len(self.image_dims) == 2:  # 2D image 4, 6, 8-connected
-            if self.neighbor_size == 4:
-                offsets = np.array([[1, 0], [-1, 0],
-                                    [0, 1], [0, -1]])
-            elif self.neighbor_size == 6:
-                offsets = np.array([[1, 0], [-1, 0],
-                                    [0, 1], [0, -1],
-                                    [1, 1], [-1, -1]])
-            elif self.neighbor_size == 8:
-                offsets = np.array([[1, 0], [-1, 0],
-                                    [0, 1], [0, -1],
-                                    [1, 1], [-1, -1],
-                                    [1, -1], [-1, 1]])
-        elif len(self.image_dims) == 3:  # 3D volume 6, 18, 26-connected
-            if self.neighbor_size == 6:
-                offsets = np.array([[1, 0, 0], [-1, 0, 0],
-                                    [0, 1, 0], [0, -1, 0],
-                                    [0, 0, -1], [0, 0, -1]])
-            elif self.neighbor_size == 18:
-                offsets = np.array([[0, -1, -1], [-1, 0, -1], [0, 0, -1],
-                                    [1, 0, -1], [0, 1, -1], [-1, -1, 0],
-                                    [0, -1, 0], [1, -1, 0], [-1, 0, 0],
-                                    [1, 0, 0], [-1, 1, 0], [0, 1, 0],
-                                    [1, 1, 0], [0, -1, 1], [-1, 0, 1],
-                                    [0, 0, 1], [1, 0, 1], [0, 1, 1]])
+        coords = np.zeros(self.offsets.shape[0] * refs.shape[0], refs.shape[1], dtype=int)
+        for r in range(self.offsets.shape[0] * refs.shape[0]):
+            coords[r * self.offsets.shape[0]:(r + 1) * self.offsets.shape[0], :] = refs[r, :] + self.offsets
 
-            elif self.neighbor_size == 26:
-                offsets = np.array([[-1, -1, -1], [0, -1, -1], [1, -1, -1],
-                                    [-1, 0, -1], [0, 0, -1], [1, 0, -1],
-                                    [-1, 1, -1], [0, 1, -1], [1, 1, -1],
-                                    [-1, -1, 0], [0, -1, 0], [1, -1, 0],
-                                    [-1, 0, 0], [1, 0, 0], [-1, 1, 0],
-                                    [0, 1, 0], [1, 1, 0], [-1, -1, 1],
-                                    [0, -1, 1], [1, -1, 1], [-1, 0, 1],
-                                    [0, 0, 1], [1, 0, 1], [-1, 1, 1],
-                                    [0, 1, 1], [1, 1, 1]])
-
-        self.offsets = offsets
-
-    def computing(self, ref):
-        """
-
-        Parameters
-        ----------
-        refs list or nd array
-            Each row represents the coordinates for a ref points
-        """
-
-        ref = np.array(ref)
-
-        coors = ref + self.offsets
-        return coors[is_in_image(coors, self.image_dims), :]
-
-
-class Sphere(SpatialNeighbor):
-    """
-
-    Define sphere neighbor for a pixel
-
-    """
-
-    def __init__(self, image_dims, neighbor_size):
-
-        super(Sphere, self).__init__(image_dims, neighbor_size)
-
-        offsets = []
-        if self.image_dims == 2:
-            for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                    if np.linalg.norm([x, y]) <= self.neighbor_size:
-                        offsets.append([x, y])
-
-        elif self.image_dims == 3:
-            for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                    for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                        if np.linalg.norm([x, y, z]) <= self.neighbor_size:
-                            offsets.append([x, y, z])
-
-        self.offsets = offsets
-
-    def computing(self, ref):
-        coors = ref + np.array(self.offsets)
-        return coors[is_in_image(coors, self.image_dims), :]
-
-
-class Cube(SpatialNeighbor):
-    """
-    Define cube neighbor for a pixel
-
-    """
-
-    def __init__(self, image_dims, neighbor_size):
-        super(Cube, self).__init__(image_dims, neighbor_size)
-
-        offsets = []
-        if self.image_dims == 2:
-            for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                    offsets.append([x, y])
-
-        elif self.image_dims == 3:
-            for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                    for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
-                        offsets.append([x, y, z])
-
-        self.offsets = offsets
-
-    def computing(self, ref):
-        coors = ref + np.array(self.offsets)
-        return coors[is_in_image(coors, self.image_dims), :]
+        coords = coords[is_in_image(coords, self.image_shape), :]
+        return coords
 
 
 def is_in_image(coors, image_shape):
@@ -206,15 +162,8 @@ def is_in_image(coors, image_shape):
 
 
 if __name__ == "__main__":
-    conn = Connectivity((20, 20, 20), 26)
-    print 'Connectivity\n', conn.compute((20, 15, 15))
-
-    sph = Sphere((20, 20, 20), 3)
-    print 'Sphere\n', sph.compute((20, 19, 18))
-
-    cube = Cube((20, 20, 20), 3)
-    print 'Cube\n', cube.compute((20, 19, 18))
-
+    nb = SpatialNeighbor('connected', 26, (20, 20, 20))
+    print nb.compute((20, 15, 15))
 
 
 
