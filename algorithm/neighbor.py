@@ -2,201 +2,168 @@
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 
 """
-Generate neighbor for a refer point.
+Neighbor Generator for a set of refer points(pixels or voxels).
 
 """
 import numpy as np
 
+import utils
+
 
 class SpatialNeighbor(object):
-    """Define spatial neighbor for a pixel or voxel.
+    """Define spatial neighbor for a region which consists of of points(pixels or voxels).
     
-    Return
-    ------
-        offsets: 2xN or 3xN np array
-    
-    Contributions
-    -------------
-        Author: Zonglei Zhen
-        Editor: 
-    
+    Attributes
+    ----------
+    offsets: 2d numpy array(Nx2 or Nx3)
+        Each row represents a relative offset to the ref points
+    neighbor_type: str
+        Type for the neighbors. Supported types include 'connected', 'sphere', and 'cube'
+    neighbor_size: int
+        The size of neighbor for a points(e.g. 26)
+     image_shape: tuple or list
+        The spatial shape of the target image(e.g.,(64,64,32))
     """
 
-    def __init__(self, img_shape, nb_size):
-        if len(img_shape) == 2 or len(img_shape) == 3:
-            self.img_shape = img_shape
-            self.nb_size = nb_size
+    def __init__(self, neighbor_type, image_shape, neighbor_size):
+        """
+
+        Parameters
+        ----------
+        neighbor_type: str
+            Type for the neighbors. Supported types include 'connected', 'sphere', and 'cube'
+        neighbor_size: int
+            The size of neighbor for a points(e.g. 26)
+        image_shape: int
+            The spatial shape of the target image(e.g.,2 or 3)
+        """
+
+        if len(image_shape) == 2 or len(image_shape) == 3:
+            self.image_shape = image_shape
+            self.neighbor_size = neighbor_size
+
+        else:
+            raise ValueError("The spatial dimension of image should be 2 or 3")
+
+        offsets = []
+        if neighbor_type == 'connected':
+            if len(self.image_shape) == 2:  # 2D image 4, 6, 8-connected
+                if self.neighbor_size == 4:
+                    offsets = [[1, 0], [-1, 0],
+                               [0, 1], [0, -1]]
+                elif self.neighbor_size == 6:
+                    offsets = [[1, 0], [-1, 0],
+                               [0, 1], [0, -1],
+                               [1, 1], [-1, -1]]
+                elif self.neighbor_size == 8:
+                    offsets = [[1, 0], [-1, 0],
+                               [0, 1], [0, -1],
+                               [1, 1], [-1, -1],
+                               [1, -1], [-1, 1]]
+            elif len(self.image_shape) == 3:  # 3D volume 6, 18, 26-connected
+                if self.neighbor_size == 6:
+                    offsets = [[1, 0, 0], [-1, 0, 0],
+                               [0, 1, 0], [0, -1, 0],
+                               [0, 0, -1], [0, 0, -1]]
+                elif self.neighbor_size == 18:
+                    offsets = [[0, -1, -1], [-1, 0, -1], [0, 0, -1],
+                               [1, 0, -1], [0, 1, -1], [-1, -1, 0],
+                               [0, -1, 0], [1, -1, 0], [-1, 0, 0],
+                               [1, 0, 0], [-1, 1, 0], [0, 1, 0],
+                               [1, 1, 0], [0, -1, 1], [-1, 0, 1],
+                               [0, 0, 1], [1, 0, 1], [0, 1, 1]]
+
+                elif self.neighbor_size == 26:
+                    offsets = [[-1, -1, -1], [0, -1, -1], [1, -1, -1],
+                               [-1, 0, -1], [0, 0, -1], [1, 0, -1],
+                               [-1, 1, -1], [0, 1, -1], [1, 1, -1],
+                               [-1, -1, 0], [0, -1, 0], [1, -1, 0],
+                               [-1, 0, 0], [1, 0, 0], [-1, 1, 0],
+                               [0, 1, 0], [1, 1, 0], [-1, -1, 1],
+                               [0, -1, 1], [1, -1, 1], [-1, 0, 1],
+                               [0, 0, 1], [1, 0, 1], [-1, 1, 1],
+                               [0, 1, 1], [1, 1, 1]]
+
+        elif neighbor_type == 'sphere':
+            if len(self.image_shape) == 2:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        if np.linalg.norm([x, y]) <= self.neighbor_size:
+                            offsets.append([x, y])
+
+            elif len(self.image_shape) == 3:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                            if np.linalg.norm([x, y, z]) <= self.neighbor_size:
+                                offsets.append([x, y, z])
+
+        elif neighbor_type == 'cube':
+            if len(self.image_shape) == 2:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        offsets.append([x, y])
+
+            elif len(self.image_shape) == 3:
+                for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                    for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                        for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
+                            offsets.append([x, y, z])
 
         else:
             raise ValueError("The image dimension should be 2 or 3")
 
-
-    def compute(self, ref):
-        return self.computing(ref)
+        self.offsets = np.array(offsets)
 
 
-class Connectivity(SpatialNeighbor):
-    """Define pixel connectivity for 2D or 3D image.
+    def compute(self, refs):
+        """
+        compute the neighbor for a region(i.e., a set of pixes or voxels)
 
-    Returns
-    -------
-        offsets: 2 x N or 3 x N np array
-    
-    Contributions
-    -------------
-        Author: Zonglei Zhen
-        Editor: 
-    
-    """
-
-    def __init__(self, img_shape, nb_size):
+        Parameters
+        ----------
+        refs: list, tuple or numpy 2d array
+            Each row represents the coordinates for a ref point
 
         """
 
-        :rtype : object
-        """
-        super(Connectivity, self).__init__(img_shape, nb_size)
+        if not isinstance(refs, np.ndarray):
+            refs = np.array(refs)
 
-        offsets = []
-        if len(self.img_shape) == 2:  # 2D image 4, 6, 8-connected
-            if self.nb_size == 4:
-                offsets = np.array([[1, 0], [-1, 0],
-                                    [0, 1], [0, -1]])
-            elif self.nb_size == 6:
-                offsets = np.array([[1, 0], [-1, 0],
-                                    [0, 1], [0, -1],
-                                    [1, 1], [-1, -1]])
-            elif self.nb_size == 8:
-                offsets = np.array([[1, 0], [-1, 0],
-                                    [0, 1], [0, -1],
-                                    [1, 1], [-1, -1],
-                                    [1, -1], [-1, 1]])
-        elif len(self.img_shape) == 3:  # 3D volume 6, 18, 26-connected
-            if self.nb_size == 6:
-                offsets = np.array([[1, 0, 0], [-1, 0, 0],
-                                    [0, 1, 0], [0, -1, 0],
-                                    [0, 0, -1], [0, 0, -1]])
-            elif self.nb_size == 18:
-                offsets = np.array([[0, -1, -1], [-1, 0, -1], [0, 0, -1],
-                                    [1, 0, -1], [0, 1, -1], [-1, -1, 0],
-                                    [0, -1, 0], [1, -1, 0], [-1, 0, 0],
-                                    [1, 0, 0], [-1, 1, 0], [0, 1, 0],
-                                    [1, 1, 0], [0, -1, 1], [-1, 0, 1],
-                                    [0, 0, 1], [1, 0, 1], [0, 1, 1]])
+        coords = np.zeros((self.offsets.shape[0] * refs.shape[0], refs.shape[1]), dtype=int)
+        for r in range(refs.shape[0]):
+            coords[r * self.offsets.shape[0]:(r + 1) * self.offsets.shape[0], :] = refs[r, :] + self.offsets
 
-            elif self.nb_size == 26:
-                offsets = np.array([[-1, -1, -1], [0, -1, -1], [1, -1, -1],
-                                    [-1, 0, -1], [0, 0, -1], [1, 0, -1],
-                                    [-1, 1, -1], [0, 1, -1], [1, 1, -1],
-                                    [-1, -1, 0], [0, -1, 0], [1, -1, 0],
-                                    [-1, 0, 0], [1, 0, 0], [-1, 1, 0],
-                                    [0, 1, 0], [1, 1, 0], [-1, -1, 1],
-                                    [0, -1, 1], [1, -1, 1], [-1, 0, 1],
-                                    [0, 0, 1], [1, 0, 1], [-1, 1, 1],
-                                    [0, 1, 1], [1, 1, 1]])
+        coords = coords[is_in_image(coords, self.image_shape), :]
 
-        self.offsets = offsets
-
-    def computing(self, ref):
-        coors = ref + self.offsets
-        return coors[is_in_image(coors, self.img_shape), :]
+        return utils.unique2d(coords)
 
 
-class Sphere(SpatialNeighbor):
-    """Sphere neighbor for pixels or voxels.
-    
-    Contributions
-    -------------
-        Author: Zonglei Zhen
-        Editor: 
+def is_in_image(coords, image_shape):
+    """
+    Check whether the coordinates is in the range of image.
+
+    Parameters
+    ----------
+    coors: 2d/3d numpy array
+    image_shape: a numpy array represent the shape of image
     
     """
+    if not isinstance(coords, np.ndarray):
+        coords = np.array(coords)
 
-    def __init__(self, img_shape, nb_size):
-
-        super(Sphere, self).__init__(img_shape, nb_size)
-
-        offsets = []
-        if len(self.img_shape) == 2:
-            for x in np.arange(-self.nb_size, self.nb_size + 1):
-                for y in np.arange(-self.nb_size, self.nb_size + 1):
-                    if np.linalg.norm([x, y]) <= self.nb_size:
-                        offsets.append([x, y])
-
-        elif len(self.img_shape) == 3:
-            for x in np.arange(-self.nb_size, self.nb_size + 1):
-                for y in np.arange(-self.nb_size, self.nb_size + 1):
-                    for z in np.arange(-self.nb_size, self.nb_size + 1):
-                        if np.linalg.norm([x, y, z]) <= self.nb_size:
-                            offsets.append([x, y, z])
-
-        self.offsets = offsets
-
-    def computing(self, ref):
-        coors = ref + np.array(self.offsets)
-        return coors[is_in_image(coors, self.img_shape), :]
-
-
-class Cube(SpatialNeighbor):
-    """
-    
-    Contributions
-    -------------
-        Author: Zonglei Zhen
-        Editor: 
-    
-    """
-
-    def __init__(self, img_shape, nb_size):
-        super(Cube, self).__init__(img_shape, nb_size)
-
-        offsets = []
-        if len(self.img_shape) == 2:
-            for x in np.arange(-self.nb_size, self.nb_size + 1):
-                for y in np.arange(-self.nb_size, self.nb_size + 1):
-                    offsets.append([x, y])
-
-        elif len(self.img_shape) == 3:
-            for x in np.arange(-self.nb_size, self.nb_size + 1):
-                for y in np.arange(-self.nb_size, self.nb_size + 1):
-                    for z in np.arange(-self.nb_size, self.nb_size + 1):
-                        offsets.append([x, y, z])
-
-        self.offsets = offsets
-
-    def computing(self, ref):
-        coors = ref + np.array(self.offsets)
-        return coors[is_in_image(coors, self.img_shape), :]
-
-
-def is_in_image(coors, image_shape):
-    """
-    check whether the coordinates is in the range of image.
-    """
-    if not isinstance(coors, np.ndarray):
-        coors = np.array(coors)
-    if len(coors.shape) == 1:
-        coors = coors.reshape(1, len(image_shape))
-
-    if len(coors.shape) == 2:
-        return np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
-                       coors[:, 1] >= 0, coors[:, 1] < image_shape[1]], axis=0)
-    elif len(coors.shape) == 3:
-        return np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
-                       coors[:, 1] >= 0, coors[:, 1] < image_shape[1],
-                       coors[:, 2] >= 0, coors[:, 2] < image_shape[2]], axis=0)
+    if coords.ndim == 2:
+        return np.all([coords[:, 0] >= 0, coords[:, 0] < image_shape[0],
+                       coords[:, 1] >= 0, coords[:, 1] < image_shape[1]], axis=0)
+    elif coords.ndim == 3:
+        return np.all([coords[:, 0] >= 0, coords[:, 0] < image_shape[0],
+                       coords[:, 1] >= 0, coords[:, 1] < image_shape[1],
+                       coords[:, 2] >= 0, coords[:, 2] < image_shape[2]], axis=0)
 
 
 if __name__ == "__main__":
-    conn = Connectivity((20, 20, 20), 26)
-    print 'Connectivity\n', conn.compute((20, 15, 15))
-
-    sph = Sphere((20, 20, 20), 3)
-    print 'Sphere\n', sph.compute((20, 19, 18))
-
-    cube = Cube((20, 20, 20), 3)
-    print 'Cube\n', cube.compute((20, 19, 18))
-
+    nb = SpatialNeighbor('connected', (20, 20, 20), 26)
+    print nb.compute([(20, 15, 15), (18, 16, 15)]).shape
 
 
 
