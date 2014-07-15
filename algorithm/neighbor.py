@@ -139,7 +139,7 @@ class SpatialNeighbor(object):
         return utils.unique2d(coords)
 
 
-def is_in_image(coors, image_shape):
+def is_in_image(coords, image_shape):
     """
     Check whether the coordinates is in the range of image.
 
@@ -147,19 +147,18 @@ def is_in_image(coors, image_shape):
     ----------
     coors: 2d/3d numpy array
     image_shape: a numpy array represent the shape of image
+    
     """
-    if not isinstance(coors, np.ndarray):
-        coors = np.array(coors)
-    if len(coors.shape) == 1:
-        coors = coors.reshape(1, len(image_shape))
+    if not isinstance(coords, np.ndarray):
+        coords = np.array(coords)
 
-    if len(coors.shape) == 2:
-        return np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
-                       coors[:, 1] >= 0, coors[:, 1] < image_shape[1]], axis=0)
-    elif len(coors.shape) == 3:
-        return np.all([coors[:, 0] >= 0, coors[:, 0] < image_shape[0],
-                       coors[:, 1] >= 0, coors[:, 1] < image_shape[1],
-                       coors[:, 2] >= 0, coors[:, 2] < image_shape[2]], axis=0)
+    if coords.ndim == 2:
+        return np.all([coords[:, 0] >= 0, coords[:, 0] < image_shape[0],
+                       coords[:, 1] >= 0, coords[:, 1] < image_shape[1]], axis=0)
+    elif coords.ndim == 3:
+        return np.all([coords[:, 0] >= 0, coords[:, 0] < image_shape[0],
+                       coords[:, 1] >= 0, coords[:, 1] < image_shape[1],
+                       coords[:, 2] >= 0, coords[:, 2] < image_shape[2]], axis=0)
 
 
 if __name__ == "__main__":

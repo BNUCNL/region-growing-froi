@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 from scipy.spatial import distance
 
@@ -31,12 +29,26 @@ class Seeds(object):
 
         """
 
-        self.coords = coords
-        self.sampling_number = sampling_number
+        if not isinstance(coords, np.ndarray):
+            self.coords = np.array(coords)
+
+        if 0 <= sampling_number <= self.coords.shape[0]:
+            self.sampling_number = sampling_number
+
+        else:
+            raise ValueError("The value of sampling number should be greater or equal \
+              than zeros and less or equal than the number of points.")
 
     def set_sampling_number(self, sampling_number):
+        """
+        Set sampling number
+        """
+        if 0 <= sampling_number <= self.coords.shape[0]:
+            self.sampling_number = sampling_number
 
-        self.sampling_number = sampling_number
+        else:
+            raise ValueError("The value of sampling number should be greater or equal \
+              than zeros and less or equal than the number of points.")
 
     def set_coords(self, coords):
 
@@ -52,14 +64,11 @@ class Seeds(object):
         In each sampling, only one coordinate from each group of seeds will be sampled
 
         """
-        sampling_coords = []
-        for r in range(self.sampling_number):
-            single_sampling = []
-            for g in range(len(self.coords)):
-                single_sampling.append(random.choice(self.coords[g]))
-            sampling_coords.append(single_sampling)
 
-        self.coords = sampling_coords
+        if self.sampling_number != 0:
+            self.coords = self.coords[np.random.choice(self.coords.shape[0], self.sampling_number, replace=False), :]
+
+        return self.coords
 
 
 class SimilarityCriteria:
@@ -120,16 +129,19 @@ class SimilarityCriteria:
         lsize = region.label_size
         nsize = region.neighbor_size
 
+        # compute distance for 2d image
         if image.ndim == 2:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
             neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1]]
             dist = np.abs(region_val - neighbor_val)
 
+        # compute distance for 3d image
         elif image.ndim == 3:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
             neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2]]
             dist = np.abs(region_val - neighbor_val)
 
+        # compute distance for 4d image
         else:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
             neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2], :]
