@@ -5,8 +5,10 @@ from algorithm.neighbor import *
 
 
 if __name__ == "__main__":
-    peak_coors = [(24, 36, 25), ]
-    seeds = Seeds(peak_coors)
+    mask = nib.load("../data/S2/tstat1.nii.gz")
+    mask = mask.get_data()
+    [x, y, z] = np.nonzero(mask)
+    seeds = Seeds([x, y, z])
 
     similarity_criteria = SimilarityCriteria('euclidean')
     stop_criteria = StopCriteria(300, 'size')
@@ -16,8 +18,9 @@ if __name__ == "__main__":
     image = image.get_data()
 
     spatial_neighbor = SpatialNeighbor('connected', image.shape, 26)
+    aggregator = Aggregator('DA')
 
-    srg = SeededRegionGrowing(image, seeds, similarity_criteria, stop_criteria, spatial_neighbor)
+    srg = RandomSRG(image, seeds, similarity_criteria, stop_criteria, spatial_neighbor, aggregator)
     region = srg.grow()
 
     region_label = region.label

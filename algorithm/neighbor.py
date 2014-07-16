@@ -111,7 +111,7 @@ class SpatialNeighbor(object):
                             offsets.append([x, y, z])
 
         else:
-            raise ValueError("The image dimension should be 2 or 3")
+            raise ValueError("The Neighbor Type should be 'connected', 'sphere', and 'cube'.")
 
         self.offsets = np.array(offsets)
 
