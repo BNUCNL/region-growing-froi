@@ -20,7 +20,7 @@ if __name__ == "__main__":
     srg = SeededRegionGrowing(image, seeds, similarity_criteria, stop_criteria, spatial_neighbor)
     region = srg.grow()
 
-    region_label = region.label[:region.label_size, :]
+    region_label = region.label
     print region_label
 
     srg_image = np.zeros_like(image, dtype=int)
