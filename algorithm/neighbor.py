@@ -130,6 +130,8 @@ class SpatialNeighbor(object):
         if not isinstance(refs, np.ndarray):
             refs = np.array(refs)
 
+        #print self.offsets.shape, refs.shape
+
         coords = np.zeros((self.offsets.shape[0] * refs.shape[0], refs.shape[1]), dtype=int)
         for r in range(refs.shape[0]):
             coords[r * self.offsets.shape[0]:(r + 1) * self.offsets.shape[0], :] = refs[r, :] + self.offsets
