@@ -4,6 +4,7 @@ from algorithm.regiongrowing import *
 from algorithm.neighbor import *
 import numpy as np
 
+
 if __name__ == "__main__":
     peak_coors = [(24, 36, 25), ]
     seeds = Seeds(peak_coors)
