@@ -2,7 +2,7 @@ import nibabel as nib
 
 from algorithm.regiongrowing import *
 from algorithm.neighbor import *
-
+import numpy as np
 
 if __name__ == "__main__":
     peak_coors = [(24, 36, 25), ]
@@ -23,7 +23,8 @@ if __name__ == "__main__":
     region_label = region.label[:region.label_size, :]
     print region_label
 
-    srg_image = np.zeros_like(image, dtype=int)
+    srg_image = np.zeros_like(image, dtype=np.int16)
     srg_image[region_label[:, 0], region_label[:, 1], region_label[:, 2]] = 1
     nib.save(nib.Nifti1Image(srg_image, affine), "../data/S2/SRG3d.nii.gz")
 
+    print "Program ends."
