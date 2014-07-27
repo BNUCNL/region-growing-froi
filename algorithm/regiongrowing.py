@@ -16,7 +16,7 @@ class Seeds(object):
 
     """
 
-    def __init__(self, coords, sampling_number=0):
+    def __init__(self, coords):
         """
 
         Parameters
@@ -33,23 +33,6 @@ class Seeds(object):
         else:
             self.coords = coords
 
-        if 0 <= sampling_number <= self.coords.shape[0]:
-            self.sampling_number = sampling_number
-
-        else:
-            raise ValueError("The value of sampling number should be greater or equal \
-              than zeros and less or equal than the number of points.")
-
-    def set_sampling_number(self, sampling_number):
-        """
-        Set sampling number
-        """
-        if 0 <= sampling_number <= self.coords.shape[0]:
-            self.sampling_number = sampling_number
-
-        else:
-            raise ValueError("The value of sampling number should be greater or equal \
-              than zeros and less or equal than the number of points.")
 
     def set_coords(self, coords):
 
@@ -59,17 +42,155 @@ class Seeds(object):
 
         return self.coords
 
-    def random_sampling(self):
+
+class Region(object):
+    """
+    An object to represent the region and its associated attributes
+
+    Attributes
+    ----------
+    label: numpy 2d array
+        The coordinates of the points which have been merged into the regions
+    neighbor: numpy 2 array
+        The coordinates of the points which is the neighbor of the merged region
+    label_size: int
+        size of the label of region
+    neighbor_size: int
+        size of the neighbor of the label
+
+    Methods
+    -------
+    add_label(label)
+        add the coordinates of points to the label of region
+    add_neighbor(neighbor)
+        add the coordinates of points to the neighbor of region
+    remove_neighbor(label)
+        remove the label points from the neighbor of the region
+    """
+
+    def __init__(self, label, neighbor):
         """
-        Randomly sample coordinates from the initial coordinates.
-        In each sampling, only one coordinate from each group of seeds will be sampled
+
+        Parameters
+        ----------
+        label: numpy 2d array
+            Each row represents the coordinates for a pixels. Number of the rows is the number of pixels
+        neighbor: numpy 2d array
+            Each row represents the coordinates for a pixels
 
         """
 
-        if self.sampling_number != 0:
-            self.coords = self.coords[np.random.choice(self.coords.shape[0], self.sampling_number, replace=False), :]
+        if not isinstance(label, np.ndarray):
+            raise ValueError("The current region of the Region class must be ndarray type. ")
 
-        return self.coords
+        if not isinstance(neighbor, np.ndarray):
+            raise ValueError("The neighbor of the Region class must be ndarray type. ")
+
+        self.label = label
+        self.neighbor = neighbor
+
+
+    def set_label(self, label):
+        """
+        set the coordinates of the labeled pixes
+        """
+
+        self.label = label
+
+    def get_label(self):
+        """
+        Get the the coordinates of the labeled pixels
+        """
+
+        return self.label
+
+    def get_label_size(self):
+
+        return self.label.shape[0]
+
+    def get_neighbor_size(self):
+
+        return self.neighbor.shape[0]
+
+    def set_neighbor(self, neighbor):
+        """
+        Set the coordinates of region neighbor.
+        """
+        self.neighbor = neighbor
+
+    def get_neighbor(self):
+        """
+        Get the coordinates of region neighbor.
+        """
+        return self.neighbor
+
+    def add_label(self, label):
+        """
+        Add the coordinates of new label to the label of region.
+
+        Parameters
+        ----------
+        neighbor: numpy 2d array
+            Each row represents the coordinates for a pixels
+        """
+        #print self.label.shape, label.shape
+        self.label = np.append(self.label, label, axis=0)
+
+
+    def add_neighbor(self, neighbor):
+        """
+        Add the coordinates of new neighbor to the neighbor of region.
+
+        Parameters
+        ----------
+        neighbor: numpy 2d array
+            Each row represents the coordinates for  a pixels
+        """
+
+        # find the neighbor which have been in neighbor or in label list
+        marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
+                               utils.in2d(neighbor, self.label))
+
+        # delete the marked neighbor
+        neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
+
+        # Add unmarked neighbor to the region neighbor and update the neighbor size
+        self.neighbor = np.append(self.neighbor, neighbor, axis=0)
+
+
+    def remove_neighbor(self, label):
+        """
+        Remove the coordinates of label from the neighbor of region.
+
+        Parameters
+        ----------
+        neighbor: numpy 2d array
+            Each row represents the coordinates for a pixels
+         """
+
+        # find the index of the new added labels in the region neighbor list
+        idx = np.nonzero(utils.in2d(self.neighbor, label))[0]
+        self.neighbor = np.delete(self.neighbor, idx, 0)
+
+
+    def compute_inner_boundary(self):
+
+        """
+            Compute the inner boundary
+        """
+    #Do something here.
+
+    pass
+
+
+def compute_external_boundary(self):
+
+
+    """
+        Compute the external boundary
+    """
+#Do something here.
+pass
 
 
 class SimilarityCriteria:
@@ -89,7 +210,7 @@ class SimilarityCriteria:
 
     """
 
-    def __init__(self, metric='educlidean'):
+    def __init__(self, metric='educlidean', rand_neighbor_prop=1):
         """
         Parameters
         -----------------------------------------------------
@@ -99,6 +220,7 @@ class SimilarityCriteria:
             raise ValueError("The value of metric must be str type. ")
 
         self.metric = metric
+        self.rand_neighbor_prob = rand_neighbor_prop
 
     def set_metric(self, metric):
         """
@@ -112,7 +234,21 @@ class SimilarityCriteria:
         """
         return self.metric
 
-    def compute(self, region, image, prior_image=None):
+
+    def set_rand_neighbor_prop(self, rand_neighbor_prop):
+        """
+        Get the metric of the  similarity...
+        """
+        self.rand_neighbor_prob
+        metric = rand_neighbor_prop
+
+    def get_rand_neighbor_prop(self):
+        """
+        Get the metric of the  similarity...
+        """
+        return self.rand_neighbor_prob
+
+    def compute(self, region, image):
         """
         Compute the similarity between the labeled region and its neighbors.
 
@@ -127,29 +263,37 @@ class SimilarityCriteria:
 
         """
 
-        lsize = region.label_size
-        nsize = region.neighbor_size
+        lsize = region.get_label_size()
+        nsize = region.get_neighbor_size()
+
+        if self.rand_neighbor_prob == 1:
+            nbidx = np.arange(nsize)
+
+        elif 0 < self.rand_neighbor_prop < 1:
+            nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
+
+        else:
+            raise ValueError("rand_ neighbor_prob must between 0 and 1.")
 
         # compute distance for 2d image
         if image.ndim == 2:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1]]
+            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
             dist = np.abs(region_val - neighbor_val)
 
         # compute distance for 3d image
         elif image.ndim == 3:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2]]
+            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
             dist = np.abs(region_val - neighbor_val)
 
         # compute distance for 4d image
         else:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
-            neighbor_val = image[region.neighbor[:nsize, 0], region.neighbor[:nsize, 1], region.neighbor[:nsize, 2], :]
+            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
             dist = distance.cdist(region_val, neighbor_val, self.metric)
 
-        index = dist.argmin()
-        return region.neighbor[index, :]
+        return region.neighbor[nbidx[dist.argmin()], :]
 
 
 class StopCriteria(object):
@@ -224,146 +368,6 @@ class StopCriteria(object):
         return self.stop
 
 
-class Region(object):
-    """
-    An object to represent the region and its associated attributes
-
-    Attributes
-    ----------
-    label: numpy 2d array
-        The coordinates of the points which have been merged into the regions
-    neighbor: numpy 2 array
-        The coordinates of the points which is the neighbor of the merged region
-    label_size: int
-        size of the label of region
-    neighbor_size: int
-        size of the neighbor of the label
-
-    Methods
-    -------
-    add_label(label)
-        add the coordinates of points to the label of region
-    add_neighbor(neighbor)
-        add the coordinates of points to the neighbor of region
-    remove_neighbor(label)
-        remove the label points from the neighbor of the region
-    """
-
-    def __init__(self, label, neighbor):
-        """
-
-        Parameters
-        ----------
-        label: numpy 2d array
-            Each row represents the coordinates for a pixels. Number of the rows is the number of pixels
-        neighbor: numpy 2d array
-            Each row represents the coordinates for a pixels
-
-        """
-
-        if not isinstance(label, np.ndarray):
-            raise ValueError("The current region of the Region class must be ndarray type. ")
-
-        if not isinstance(neighbor, np.ndarray):
-            raise ValueError("The neighbor of the Region class must be ndarray type. ")
-
-        self.label = label
-        self.label_size = label.shape[0]
-
-        self.neighbor = neighbor
-        self.neighbor_size = neighbor.shape[0]
-
-    def set_label(self, label):
-        """
-        set the coordinates of the labeled pixes
-        """
-
-        self.label = label
-
-    def get_label(self):
-        """
-        Get the the coordinates of the labeled pixels
-        """
-
-        return self.label
-
-    def set_neighbor(self, neighbor):
-        """
-        Set the coordinates of region neighbor.
-        """
-        self.neighbor = neighbor
-
-    def get_neighbor(self):
-        """
-        Get the coordinates of region neighbor.
-        """
-        return self.neighbor
-
-    def add_label(self, label):
-        """
-        Add the coordinates of new label to the label of region.
-
-        Parameters
-        ----------
-        neighbor: numpy 2d array
-            Each row represents the coordinates for a pixels
-        """
-        #print self.label.shape, label.shape
-        self.label = np.append(self.label, label, axis=0)
-        self.label_size += 1
-
-    def add_neighbor(self, neighbor):
-        """
-        Add the coordinates of new neighbor to the neighbor of region.
-
-        Parameters
-        ----------
-        neighbor: numpy 2d array
-            Each row represents the coordinates for  a pixels
-        """
-
-        # find the neighbor which have been in neighbor or in label list
-        marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
-                               utils.in2d(neighbor, self.label))
-
-        # delete the marked neighbor
-        neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
-
-        # Add unmarked neighbor to the region neighbor and update the neighbor size
-        self.neighbor = np.append(self.neighbor, neighbor, axis=0)
-        self.neighbor_size = self.neighbor_size + neighbor.shape[0]
-
-    def remove_neighbor(self, label):
-        """
-        Remove the coordinates of label from the neighbor of region.
-
-        Parameters
-        ----------
-        neighbor: numpy 2d array
-            Each row represents the coordinates for a pixels
-         """
-
-        # find the index of the new added labels in the region neighbor list
-        idx = np.nonzero(utils.in2d(self.neighbor, label))[0]
-        self.neighbor = np.delete(self.neighbor, idx, 0)
-        self.neighbor_size -= len(idx)
-
-
-def compute_inner_boundary(self):
-    """
-        Compute the inner boundary
-    """
-    #Do something here.
-
-    pass
-
-
-def compute_external_boundary(self):
-    """
-        Compute the external boundary
-    """
-    #Do something here.
-    pass
 
 
 class SeededRegionGrowing(object):
@@ -399,7 +403,7 @@ class SeededRegionGrowing(object):
         Parameters
         ----------
         image: numpy.array
-            a 2d/3d/4d image to be segmentated
+            a 2d/3d/4d image to be segmented
         seeds: class Seeds
             The seeds at which region growing begin
         similarity_criteria: class SimilarityCriteria
@@ -501,6 +505,7 @@ class SeededRegionGrowing(object):
             # find the nearest neighbor for the current region
             nearest_neighbor = self.similarity_criteria.compute(self.region, self.image)
             nearest_neighbor = nearest_neighbor.reshape((1, -1))
+
             # add the nearest neighbor to the region
             self.region.add_label(nearest_neighbor)
 
@@ -536,7 +541,7 @@ class Aggregator(object):
         ----------
         aggr_type:  str, optional
         Description for the method to  aggregate the regions. Supported methods include
-        'direct average'(DA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
+        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
         default is DA.
         """
         self.agg_type = agg_type
@@ -598,13 +603,64 @@ class Aggregator(object):
 
 class RandModel(object):
     """
+    Randomness model for random SRG.
+
+    Attributes
+    ----------
+    rand_mode: description of the model. Supported models include 'random seed(RS)',
+    'random neighbor(RN)' and 'random seed and neighbor model(RSN)'
+    seed_sampling_num: sampling number for the seed
+    neighbor_prop: proportion of random neighbor
 
     """
 
-    def __init__(self, mode, num, prop=0.5):
-        self.mode = mode
-        self.sum = num
-        self.prop = prop
+    def __init__(self, rand_mode, seed_sampling_num=0, neighbor_prop=0.5):
+        self.rand_mode = rand_mode
+        self.seed_sampling_num = seed_sampling_num
+        self.neighbor_prop = neighbor_prop
+
+        if seed_sampling_num >= 0:
+            self.seed_sampling_num = seed_sampling_num
+        else:
+            raise ValueError("The value of sampling number should be greater or equal \
+              than zeros.")
+
+
+    def set_rand_mode(self, mode):
+        """
+        Set the rand mode.
+        """
+        self.rand_mode = mode
+
+    def get_rand_mode(self):
+        """
+        Get the rand mode
+        """
+        return self.rand_mode
+
+    def set_seed_sampling_number(self, sampling_number):
+        """
+        Set sampling number
+        """
+        if sampling_number >= 0:
+            self.seed_sampling_num = sampling_number
+
+        else:
+            raise ValueError("The value of sampling number should be greater or equal \
+              than zeros.")
+
+    def set_neighbor_prop(self, prop):
+        """
+        Set the prop for the rand neighbor.
+        """
+        self.neighbor_prop = prop
+
+    def get_neighbor_prop(self):
+        """
+        Get the prop for the rand neighbor
+        """
+        return self.neighbor_prop
+
 
 class RandomSRG(SeededRegionGrowing):
     """
@@ -623,6 +679,8 @@ class RandomSRG(SeededRegionGrowing):
         The stop criteria which control when the region growing stop
     neighbor: SpatialNeighbor object
         The neighbor generator which generate the spatial neighbor(coordinates)for a point
+    rand_model: RandModel object
+        The model for randomization in growing
 
     Methods
     -------
@@ -631,7 +689,7 @@ class RandomSRG(SeededRegionGrowing):
 
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor,rand_mode):
+    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor, rand_model):
         """
 
         Parameters
@@ -651,6 +709,25 @@ class RandomSRG(SeededRegionGrowing):
 
         super(RandomSRG, self).__init__(image, seeds, similarity_criteria, stop_criteria, neighbor)
         #self.aggregator = aggregator
+        self.rand_model = rand_model
+
+
+    def seed_sampling(self):
+        """
+        Randomly sample coordinates from the initial coordinates.
+        In each sampling, only one coordinate from each group of seeds will be sampled
+
+        """
+
+        sampling_number = self.rand_model.get_sampling_number()
+        seed_coords = self.seeds.get_coords()
+
+        if sampling_number() != 0:
+            sampling_coords = seeds_coords[np.random.choice(seed_coords.shape[0], sampling_number, replace=False), :]
+        else:
+            sampling_coords = seed_coords
+
+        return sampling_coords
 
 
     def grow(self):
@@ -663,10 +740,7 @@ class RandomSRG(SeededRegionGrowing):
         regions:  a list of Region object
 
         """
-        self.seeds.random_sampling()
-        rand_coords = np.empty_like(self.seeds.get_coords())
-        rand_coords[:] = self.seeds.get_coords()
-
+        rand_coords = self.seed_sampling()
         regions = []
         for seed in rand_coords:
             self.seeds.set_coords(seed.reshape((1, -1)))
@@ -738,7 +812,7 @@ class AdaptiveSRG(SeededRegionGrowing):
 
 
 if __name__ == "__main__":
-    seed_coords = (((1, 2, 3), (3, 2, 1)), ((4, 5, 6), (6, 5, 1)))
-    seeds3d = Seeds(seed_coords)
+    seedcoords = (((1, 2, 3), (3, 2, 1)), ((4, 5, 6), (6, 5, 1)))
+    seeds3d = Seeds(seedcoords)
     print seeds3d.get_coords()
 
