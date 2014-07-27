@@ -10,7 +10,7 @@ if __name__ == "__main__":
     seed_coords = np.array(np.nonzero(mask >= 0.6))
     seeds = Seeds(seed_coords.T)
 
-    similarity_criteria = SimilarityCriteria('euclidean', 0.5)
+    similarity_criteria = SimilarityCriteria('euclidean', 0.8)
     stop_criteria = StopCriteria(300, 'size')
 
     image = nib.load("../data/S2/tstat1.nii.gz")
@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     spatial_neighbor = SpatialNeighbor('connected', image.shape, 26)
 
-    srg = RandomSRG(image, seeds, similarity_criteria, stop_criteria, spatial_neighbor)
+    srg = RandomSRG(image, seeds, similarity_criteria, stop_criteria, spatial_neighbor, 5)
     region = srg.grow()
 
     #print region.shape
