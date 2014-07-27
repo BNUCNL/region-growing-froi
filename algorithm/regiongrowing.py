@@ -178,17 +178,17 @@ class Region(object):
         """
             Compute the inner boundary
         """
+
     #Do something here.
 
     pass
 
 
 def compute_external_boundary(self):
-
-
     """
         Compute the external boundary
     """
+
 #Do something here.
 pass
 
@@ -365,8 +365,6 @@ class StopCriteria(object):
 
     def isstop(self):
         return self.stop
-
-
 
 
 class SeededRegionGrowing(object):
@@ -598,67 +596,6 @@ class Aggregator(object):
         agg_image = np.average(region_image, axis=3, weights=weight)
 
         return agg_image
-
-
-class RandModel(object):
-    """
-    Randomness model for random SRG.
-
-    Attributes
-    ----------
-    rand_mode: description of the model. Supported models include 'random seed(RS)',
-    'random neighbor(RN)' and 'random seed and neighbor model(RSN)'
-    seed_sampling_num: sampling number for the seed
-    neighbor_prop: proportion of random neighbor
-
-    """
-
-    def __init__(self, rand_mode, seed_sampling_num=0, neighbor_prop=0.5):
-        self.rand_mode = rand_mode
-        self.seed_sampling_num = seed_sampling_num
-        self.neighbor_prop = neighbor_prop
-
-        if seed_sampling_num >= 0:
-            self.seed_sampling_num = seed_sampling_num
-        else:
-            raise ValueError("The value of sampling number should be greater or equal \
-              than zeros.")
-
-
-    def set_rand_mode(self, mode):
-        """
-        Set the rand mode.
-        """
-        self.rand_mode = mode
-
-    def get_rand_mode(self):
-        """
-        Get the rand mode
-        """
-        return self.rand_mode
-
-    def set_seed_sampling_number(self, sampling_number):
-        """
-        Set sampling number
-        """
-        if sampling_number >= 0:
-            self.seed_sampling_num = sampling_number
-
-        else:
-            raise ValueError("The value of sampling number should be greater or equal \
-              than zeros.")
-
-    def set_neighbor_prop(self, prop):
-        """
-        Set the prop for the rand neighbor.
-        """
-        self.neighbor_prop = prop
-
-    def get_neighbor_prop(self):
-        """
-        Get the prop for the rand neighbor
-        """
-        return self.neighbor_prop
 
 
 class RandomSRG(SeededRegionGrowing):
