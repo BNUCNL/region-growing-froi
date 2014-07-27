@@ -587,6 +587,16 @@ class Aggregator(object):
         return agg_image
 
 
+class RandModel(object):
+    """
+
+    """
+
+    def __init__(self, mode, num, prop=0.5):
+        self.mode = mode
+        self.sum = num
+        self.prop = prop
+
 class RandomSRG(SeededRegionGrowing):
     """
     Seeded region growing based on random seeds.
@@ -612,7 +622,7 @@ class RandomSRG(SeededRegionGrowing):
 
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor):
+    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor,rand_mode):
         """
 
         Parameters
