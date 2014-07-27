@@ -526,11 +526,11 @@ class Aggregator(object):
     ----------
     aggr_type:  str, optional
         Description for the method to  aggregate the regions. Supported methods include
-        'direct average'(DA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
+        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
         default is DA.
     """
 
-    def __init__(self, agg_type='DA'):
+    def __init__(self, agg_type='UWA'):
         """
         Parameters
         ----------
@@ -568,21 +568,30 @@ class Aggregator(object):
         print len(region)
 
         region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
-        if self.agg_type == 'DA':
+        weight = np.ones(len(region))
+        if self.agg_type == 'UWA':
             for r in range(len(region)):
                 label = region[r].get_label()
                 region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
 
-            agg_image = np.mean(region_image, axis=3)
-
         elif self.agg_type == 'MWA':
-            pass
+            for r in range(len(region)):
+                label = region[r].get_label()
+                region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
+
+                weight[r] = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
 
         elif self.agg_type == 'HWA':
-            pass
+            for r in range(len(region)):
+                label = region[r].get_label()
+                region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
+                weight[r] = np.std(image[label[:, 0], label[:, 1], label[:, 2]])
 
         else:
             raise ValueError("The Type of aggregator should be 'DA', 'MWA', and 'HWA'.")
+
+        weight = weight / weight.sum()
+        agg_image = np.average(region_image, axis=3, weights=weight)
 
         return agg_image
 
