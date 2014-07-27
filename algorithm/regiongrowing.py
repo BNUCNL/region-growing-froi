@@ -82,6 +82,7 @@ class Region(object):
 
         self.label = label
         self.neighbor = neighbor
+        self.boundary = None
 
 
     def set_label(self, label):
@@ -166,17 +167,19 @@ class Region(object):
         idx = np.nonzero(utils.in2d(self.neighbor, label))[0]
         self.neighbor = np.delete(self.neighbor, idx, 0)
 
-
-    def compute_boundary(self):
+    def compute_boundary(self, spatial_neighbor):
 
         """
             Compute the  boundary for the label
         """
 
-    #Do something here.
+        boundary = np.zeros(self.label.shape[0])
+        for v in range(self.label.shape[0]):
+            nb = spatial_neighbor.compute(self.label[v, :])
+            if not np.all(utils.in2d(nb, self.label)):
+                boundary[v] = True
 
-    pass
-
+        self.boundary = self.label[boundary, :]
 
 
 class SimilarityCriteria:
