@@ -559,7 +559,7 @@ class Aggregator(object):
 
         """
         if image.ndim == 2:
-            shape = shape = (image.shape[0], image.shape[1], len(region))
+            shape = (image.shape[0], image.shape[1], len(region))
         elif image.ndim == 3 or image.ndim == 4:
             shape = (image.shape[0], image.shape[1], image.shape[2], len(region))
         else:
@@ -588,7 +588,7 @@ class Aggregator(object):
                 weight[r] = np.std(image[label[:, 0], label[:, 1], label[:, 2]])
 
         else:
-            raise ValueError("The Type of aggregator should be 'DA', 'MWA', and 'HWA'.")
+            raise ValueError("The Type of aggregator should be 'UWA', 'MWA', and 'HWA'.")
 
         weight = weight / weight.sum()
         agg_image = np.average(region_image, axis=3, weights=weight)
