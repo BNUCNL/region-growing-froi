@@ -237,14 +237,13 @@ class SimilarityCriteria:
 
     def set_rand_neighbor_prop(self, rand_neighbor_prop):
         """
-        Get the metric of the  similarity...
+        Set the neighbor prop for randomization
         """
-        self.rand_neighbor_prob
-        metric = rand_neighbor_prop
+        self.rand_neighbor_prop = rand_neighbor_prop
 
     def get_rand_neighbor_prop(self):
         """
-        Get the metric of the  similarity...
+        Get the neighbor prop for randomization
         """
         return self.rand_neighbor_prob
 
@@ -689,7 +688,7 @@ class RandomSRG(SeededRegionGrowing):
 
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor, rand_model):
+    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor, seed_sampling_num):
         """
 
         Parameters
@@ -704,12 +703,14 @@ class RandomSRG(SeededRegionGrowing):
             The stop criteria which control when the region growing stop
         neighbor: SpatialNeighbor object
             The neighbor generator which generate the spatial neighbor(coordinates)for a point
+        seed_sampling_num: int, optional
+           It gives the sampling number for seeds
 
         """
 
         super(RandomSRG, self).__init__(image, seeds, similarity_criteria, stop_criteria, neighbor)
         #self.aggregator = aggregator
-        self.rand_model = rand_model
+        self.seed_sampling_num = seed_sampling_num
 
 
     def seed_sampling(self):
@@ -719,11 +720,11 @@ class RandomSRG(SeededRegionGrowing):
 
         """
 
-        sampling_number = self.rand_model.get_sampling_number()
         seed_coords = self.seeds.get_coords()
 
-        if sampling_number() != 0:
-            sampling_coords = seeds_coords[np.random.choice(seed_coords.shape[0], sampling_number, replace=False), :]
+        if sampling_number() > 0:
+            sampling_coords = seed_coords[np.random.choice(seed_coords.shape[0], self.seed_sampling_num, replace=True),
+                              :]
         else:
             sampling_coords = seed_coords
 
