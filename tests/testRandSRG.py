@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     #print region.shape
 
-    aggregator = Aggregator('DA')
+    aggregator = Aggregator('MWA')
     srg_image = aggregator.compute(region, image)
 
 
