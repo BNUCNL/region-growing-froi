@@ -11,9 +11,6 @@ class Seeds(object):
     ----------
     coords: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),]
         The element of the list is a series tuples, each of which in turn holds the coordinates of a point
-    sampling_number: int
-        The sampling number for random sampling
-
     """
 
     def __init__(self, coords):
@@ -23,8 +20,6 @@ class Seeds(object):
         ----------
         coords: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),()]
             The element of the list is a series tuples, which in turn holds the coordinates of a point
-        sampling_number: int
-            the sampling number for random sampling.
 
         """
 
@@ -53,10 +48,9 @@ class Region(object):
         The coordinates of the points which have been merged into the regions
     neighbor: numpy 2 array
         The coordinates of the points which is the neighbor of the merged region
-    label_size: int
-        size of the label of region
-    neighbor_size: int
-        size of the neighbor of the label
+    boundary: numpy 2d array
+        The coordinates of the points which is the boundary of current label
+
 
     Methods
     -------
@@ -173,24 +167,16 @@ class Region(object):
         self.neighbor = np.delete(self.neighbor, idx, 0)
 
 
-    def compute_inner_boundary(self):
+    def compute_boundary(self):
 
         """
-            Compute the inner boundary
+            Compute the  boundary for the label
         """
 
     #Do something here.
 
     pass
 
-
-def compute_external_boundary(self):
-    """
-        Compute the external boundary
-    """
-
-#Do something here.
-pass
 
 
 class SimilarityCriteria:
@@ -215,22 +201,27 @@ class SimilarityCriteria:
         Parameters
         -----------------------------------------------------
         metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
         """
         if not isinstance(metric, str):
-            raise ValueError("The value of metric must be str type. ")
+            raise ValueError("The metric must be a str. ")
 
         self.metric = metric
-        self.rand_neighbor_prob = rand_neighbor_prop
+
+        if 0 < rand_neighbor_prop <= 1:
+            self.rand_neighbor_prop = rand_neighbor_prop
+        else:
+            raise ValueError("The rand_neighbor_prop must be between 0 and 1. ")
 
     def set_metric(self, metric):
         """
-        Get the metric of the  similarity...
+        Set the metric of the  similarity
         """
         self.metric = metric
 
     def get_metric(self):
         """
-        Get the metric of the  similarity...
+        Get the metric of the  similarity
         """
         return self.metric
 
@@ -245,7 +236,7 @@ class SimilarityCriteria:
         """
         Get the neighbor prop for randomization
         """
-        return self.rand_neighbor_prob
+        return self.rand_neighbor_prop
 
     def compute(self, region, image):
         """
@@ -265,14 +256,11 @@ class SimilarityCriteria:
         lsize = region.get_label_size()
         nsize = region.get_neighbor_size()
 
-        if self.rand_neighbor_prob == 1:
+        if self.rand_neighbor_prop == 1:
             nbidx = np.arange(nsize)
-
-        elif 0 < self.rand_neighbor_prop < 1:
+        else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-        else:
-            raise ValueError("rand_ neighbor_prob must between 0 and 1.")
 
         # compute distance for 2d image
         if image.ndim == 2:
@@ -360,7 +348,7 @@ class StopCriteria(object):
         """
 
         if self.metric == 'size':
-            if region.label_size >= self.threshold:
+            if region.get_label_size() >= self.threshold:
                 self.stop = True
 
     def isstop(self):
@@ -377,13 +365,13 @@ class SeededRegionGrowing(object):
     image: numpy 2d/3d/4d array
         The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first three dimension is spatial dimension and
         the fourth dimension is time or feature dimension
-    seeds: class Seeds
+    seeds: Seeds object
         The seeds at which region growing begin
-    similarity_criteria: class SimilarityCriteria
+    similarity_criteria: SimilarityCriteria object
         The similarity criteria which control the neighbor to merge to the region
-    stop_criteria: class StopCriteria
+    stop_criteria: StopCriteria object
         The stop criteria which control when the region growing stop
-    neighbor:class SpatialNeighbor
+    neighbor: SpatialNeighbor object
         The neighbor generator which generate the spatial neighbor(coordinates)for a point
 
     Methods
@@ -495,7 +483,7 @@ class SeededRegionGrowing(object):
         """
         # initialize the region
         region_label = self.seeds.coords
-        region_neighbor = self.neighbor.compute(self.seeds.coords)  # compute the neighbor for the current region(label)
+        region_neighbor = self.neighbor.compute(region_label)  # compute the neighbor for the current region(label)
         self.region = Region(region_label, region_neighbor)
 
         while not self.stop_criteria.isstop():
@@ -615,8 +603,8 @@ class RandomSRG(SeededRegionGrowing):
         The stop criteria which control when the region growing stop
     neighbor: SpatialNeighbor object
         The neighbor generator which generate the spatial neighbor(coordinates)for a point
-    rand_model: RandModel object
-        The model for randomization in growing
+    seed_sampling_num: int, optional
+        The sampling number for seed with replacement
 
     Methods
     -------
@@ -641,13 +629,17 @@ class RandomSRG(SeededRegionGrowing):
         neighbor: SpatialNeighbor object
             The neighbor generator which generate the spatial neighbor(coordinates)for a point
         seed_sampling_num: int, optional
-           It gives the sampling number for seeds
+           The random sampling number for seeds
 
         """
 
         super(RandomSRG, self).__init__(image, seeds, similarity_criteria, stop_criteria, neighbor)
         #self.aggregator = aggregator
-        self.seed_sampling_num = seed_sampling_num
+
+        if seed_sampling_num >= 0:
+            self.seed_sampling_num = seed_sampling_num
+        else:
+            raise ValueError("The  seed_sampling_num must be a positive int")
 
 
     def seed_sampling(self):
@@ -659,7 +651,7 @@ class RandomSRG(SeededRegionGrowing):
 
         seed_coords = self.seeds.get_coords()
 
-        if sampling_number() > 0:
+        if self.seed_sampling_num > 0:
             sampling_coords = seed_coords[np.random.choice(seed_coords.shape[0], self.seed_sampling_num, replace=True),
                               :]
         else:
