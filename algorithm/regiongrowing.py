@@ -181,6 +181,13 @@ class Region(object):
 
         self.boundary = self.label[boundary, :]
 
+    def get_boundary(self):
+        """
+        Get the boundary for the label
+        """
+
+        return self.boundary
+
 
 class SimilarityCriteria:
     """
@@ -310,7 +317,7 @@ class StopCriteria(object):
         """
         Parameters
         ----------
-        threshold: float
+        threshold: numpy 1d array  or a list or a tuple
             The default is None which means the adaptive method will be used.
         criteria_metric: str, optional
             A description for the metric type. The supported types include 'homogeneity','size','gradient'.
@@ -708,13 +715,15 @@ class Optimizer(object):
             default is PC.
         """
 
+        self.opt_type = opt_type
+
     def compute(self, region, image):
         """
         Find the optimal segmentation according to the specified optimization criteria
 
         Parameters
         ----------
-        region: A list of regions.
+        region: A list of region object
             A set of regions to be aggregated
         image: numpy 2d/3d/4d/ array
             image to be  segmented.
@@ -722,7 +731,12 @@ class Optimizer(object):
         """
 
         if self.opt_type == 'PC':
-            pass
+            contrast = np.mean(image[region.boundary[:, 0], region.boundary[:, 1], region.boundary[:, 2]]) \
+                       - np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1], region.neighbor[:, 2]])
+
+        elif self.opt_type == 'AC':
+            contrast = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]]) \
+                       - np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1], region.neighbor[:, 2]])
 
         else:
             raise ValueError("The Type of aggregator should be 'DA', 'MWA', and 'HWA'.")
@@ -742,6 +756,10 @@ class AdaptiveSRG(SeededRegionGrowing):
         """
         Adaptive region growing.
         """
+
+        regions = []
+        regions.append(super(AdaptiveSRG, self).grow())
+        self.stop_criteria.set_stop()
 
 
 if __name__ == "__main__":
