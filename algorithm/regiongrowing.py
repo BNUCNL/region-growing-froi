@@ -49,13 +49,13 @@ class Region(object):
         """
 
         self.seed = seed
+        self.neighbor = self.neighbor_element.compute(seed)
 
     def get_seed(self):
         """
         Get the the coordinates of the seeds
         """
         return self.seed
-
 
     def seed_sampling(self, sampling_num):
         """
@@ -343,7 +343,7 @@ class StopCriteria(object):
 
         return self.stop
 
-    def reset_stop(self):
+    def set_stop(self):
         """
         Reset the stop signal
         """
@@ -533,55 +533,45 @@ class Aggregator(object):
         return agg_image
 
 
-class RandomSRG(object):
+class RandomSRG(SeededRegionGrowing):
     """
     Seeded region growing based on random seeds.
 
-        Attributes
+    Attributes
     ----------
-    image: numpy 2d/3d/4d array
-        The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first three dimension is spatial dimension and
-        the fourth dimension is time or feature dimension
-    seeds: Seeds object
-        The seeds at which region growing begin
     similarity_criteria: SimilarityCriteria object
         The similarity criteria which control the neighbor to merge to the region
     stop_criteria: StopCriteria object
         The stop criteria which control when the region growing stop
-    neighbor: SpatialNeighbor object
-        The neighbor generator which generate the spatial neighbor(coordinates)for a point
     seed_sampling_num: int, optional
         The sampling number for seed with replacement
 
     Methods
     -------
-    grow()
-        do region growing
+    computing(image,region,threshold)
+        Do region growing
 
     """
 
-    def __init__(self, srg, seed_sampling_num, aggregator=None):
+    def __init__(self, similarity_criteria, stop_criteria, seed_sampling_num):
         """
+        Initialize the object
 
         Parameters
         ----------
-        srg: SeedRegionGrowing object
-        seed_sampling_num: int, optional
-           The random sampling number for seeds
-        aggregator: Aggregator object
+        similarity_criteria: class SimilarityCriteria
+            The similarity criteria which control the neighbor to merge to the region
+        stop_criteria: class StopCriteria
+            The stop criteria which control when the region growing stop
 
         """
 
-        self.srg = srg
-        self.aggregator = aggregator
-
-        if seed_sampling_num >= 0:
-            self.seed_sampling_num = seed_sampling_num
-        else:
-            raise ValueError("The  seed_sampling_num must be a positive int")
+        self.similarity_criteria = similarity_criteria
+        self.stop_criteria = stop_criteria
+        self.seed_sampling_num = seed_sampling_num
 
 
-    def compute(self, region, image, thres):
+    def compute(self, region, image, threshold):
         """
         Aggregation for different regions
 
@@ -591,12 +581,14 @@ class RandomSRG(object):
         regions:  a list of Region object
 
         """
-        rand_coords = self.seed_sampling()
         regions = []
-        for seed in rand_coords:
-            self.srg.set_seeds(Seeds(seed.reshape((1, -1))))
-            regions.append(copy.copy(self.srg.grow()))
-            self.srg.get_stop_criteria().set_stop(False)
+        coords = region.seed_sampling(self.seed_sampling_num)
+
+        for seed in coords:
+            region.set_seed(seed)
+            reg = super(RandomSRG, self).compute(region, image, threshold)
+            regions.append(copy.copy(reg))
+            self.stop_criteria.set_stop()
 
         #region = self.aggregator.compute(regions, self.image)
 
