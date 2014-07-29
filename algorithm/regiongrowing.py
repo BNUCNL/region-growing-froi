@@ -43,6 +43,7 @@ class Region(object):
         self.label = seed
         self.neighbor = neighbor_element.compute(seed)
 
+
     def set_seed(self, seed):
         """
         set the coordinates of the seeds
@@ -110,7 +111,8 @@ class Region(object):
             Each row represents the coordinates for a pixels
         """
 
-        self.label = np.array(self.label.tolist() + label.tolist())
+        #self.label = np.array(self.label.tolist() + label.tolist())
+        self.label = np.append(self.label, label, axis=0)
 
 
     def get_label(self):
@@ -137,6 +139,7 @@ class Region(object):
         """
 
         neighbor = self.neighbor_element.compute(neighbor)
+
 
         # find the neighbor which have been in neighbor or in label list
         marked = np.logical_or(utils.in2d(neighbor, self.neighbor), utils.in2d(neighbor, self.label))
@@ -379,9 +382,9 @@ class SeededRegionGrowing(object):
 
         Parameters
         ----------
-        similarity_criteria: class SimilarityCriteria
+        similarity_criteria: SimilarityCriteria object
             The similarity criteria which control the neighbor to merge to the region
-        stop_criteria: class StopCriteria
+        stop_criteria: StopCriteria object
             The stop criteria which control when the region growing stop
 
         """
