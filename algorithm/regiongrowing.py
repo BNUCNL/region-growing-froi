@@ -5,66 +5,24 @@ from scipy.spatial import distance
 from algorithm.neighbor import *
 
 
-class Seeds(object):
-    """
-    An object hold the coordinates of seeded points and randomly sample the points
-
-    Attributes
-    ----------
-    coords: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),]
-        The element of the list is a series tuples, each of which in turn holds the coordinates of a point
-    """
-
-    def __init__(self, coords):
-        """
-
-        Parameters
-        ----------
-        coords: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),()]
-            The element of the list is a series tuples, which in turn holds the coordinates of a point
-
-        """
-
-        if not isinstance(coords, np.ndarray):
-            self.coords = np.array(coords)
-        else:
-            self.coords = coords
-
-
-    def set_coords(self, coords):
-
-        self.coords = coords
-
-    def get_coords(self):
-
-        return self.coords
-
-
 class Region(object):
     """
     An object to represent the region and its associated attributes
 
     Attributes
     ----------
+    seed: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),]
+        The element of the list is a series tuples, each of which in turn holds the coordinates of a point
+    neighbor_element: SpatialNeighbor object
+        The neighbor generator which generate the spatial neighbor(coordinates)for a point
     label: numpy 2d array
         The coordinates of the points which have been merged into the regions
     neighbor: numpy 2 array
         The coordinates of the points which is the neighbor of the merged region
-    boundary: numpy 2d array
-        The coordinates of the points which is the boundary of current label
 
-
-    Methods
-    -------
-    add_label(label)
-        add the coordinates of points to the label of region
-    add_neighbor(neighbor)
-        add the coordinates of points to the neighbor of region
-    remove_neighbor(label)
-        remove the label points from the neighbor of the region
     """
 
-    def __init__(self, label, neighbor):
+    def __init__(self, seed, neighbor_element):
         """
 
         Parameters
@@ -76,50 +34,68 @@ class Region(object):
 
         """
 
-        if not isinstance(label, np.ndarray):
-            raise ValueError("The current region of the Region class must be ndarray type. ")
+        if not isinstance(seed, np.ndarray):
+            raise ValueError("The seed must be a ndarray. ")
 
-        if not isinstance(neighbor, np.ndarray):
-            raise ValueError("The neighbor of the Region class must be ndarray type. ")
+        self.seed = seed
+        self.neighbor_element = neighbor_element
 
-        self.label = label
-        self.neighbor = neighbor
-        self.boundary = None
+        self.label = seed
+        self.neighbor = neighbor_element.compute(seed)
 
-
-    def set_label(self, label):
+    def set_seed(self, seed):
         """
-        set the coordinates of the labeled pixes
+        set the coordinates of the seeds
         """
 
-        self.label = label
+        self.seed = seed
 
-    def get_label(self):
+    def get_seed(self):
         """
-        Get the the coordinates of the labeled pixels
+        Get the the coordinates of the seeds
         """
+        return self.seed
 
-        return self.label
 
-    def get_label_size(self):
+    def seed_sampling(self, sampling_num):
+        """
+        Randomly sample coordinates from the seeds.
+        In each sampling, only one coordinate from each group of seeds will be sampled
 
+        """
+        if sampling_num > 0:
+            sampling_seeds = self.seed[np.random.choice(self.seed.shape[0], sampling_num, replace=True), :]
+        else:
+            sampling_seed = self.seed
+
+        return sampling_seed
+
+    def label_size(self):
+        """
+        Return the size of current label.
+        """
         return self.label.shape[0]
 
-    def get_neighbor_size(self):
+    def neighbor_size(self):
+        """
+        Return the size of current neighbor.
+        """
 
         return self.neighbor.shape[0]
 
-    def set_neighbor(self, neighbor):
+    def set_neighbor_element(self, neighbor_element):
         """
         Set the coordinates of region neighbor.
         """
-        self.neighbor = neighbor
+        self.neighbor_element = neighbor_element
 
-    def get_neighbor(self):
+
+    def get_neighbor_element(self, neighbor_element):
         """
-        Get the coordinates of region neighbor.
+        Set the coordinates of region neighbor.
         """
-        return self.neighbor
+        return self.neighbor_element
+
 
     def add_label(self, label):
         """
@@ -130,9 +106,21 @@ class Region(object):
         neighbor: numpy 2d array
             Each row represents the coordinates for a pixels
         """
-        #print self.label.shape, label.shape
+
         self.label = np.append(self.label, label, axis=0)
 
+    def get_label(self):
+        """
+        Get the the coordinates of the labeled pixels
+        """
+        return self.label
+
+
+    def get_neighbor(self):
+        """
+        Get the the coordinates of the neighbor pixels
+        """
+        return self.neighbor
 
     def add_neighbor(self, neighbor):
         """
@@ -181,14 +169,7 @@ class Region(object):
             if not np.all(utils.in2d(nb, self.label)):
                 boundary[v] = True
 
-        self.boundary = self.label[boundary, :]
-
-    def get_boundary(self):
-        """
-        Get the boundary for the label
-        """
-
-        return self.boundary
+        return self.label[boundary, :]
 
 
 class SimilarityCriteria:
@@ -236,7 +217,6 @@ class SimilarityCriteria:
         Get the metric of the  similarity
         """
         return self.metric
-
 
     def set_rand_neighbor_prop(self, rand_neighbor_prop):
         """
@@ -305,22 +285,19 @@ class StopCriteria(object):
         A description for the metric type
     stop: boolean
         Indicate the growing status: False or True
-    threshold: float
-        A value to represent a indicates providing the threshold at which growing should stop
+
 
     Methods
     -------
-    compute(self, region, image)
+    compute(self, region, image,threshold)
         determine whether the growing should stop
 
     """
 
-    def __init__(self, threshold, criteria_metric='size'):
+    def __init__(self, criteria_metric='size', stop=False):
         """
         Parameters
         ----------
-        threshold: numpy 1d array  or a list or a tuple
-            The default is None which means the adaptive method will be used.
         criteria_metric: str, optional
             A description for the metric type. The supported types include 'homogeneity','size','gradient'.
             Default is 'size'
@@ -328,16 +305,11 @@ class StopCriteria(object):
         """
 
         self.metric = criteria_metric
-
-        if not isinstance(threshold, np.ndarray):
-            threshold = np.array(threshold)
-
-        self.threshold = threshold
-        self.stop = False
+        self.stop = stop
 
     def set_metric(self, metric):
         """
-        Get the name of the stop criteria..
+        Set the name of the stop criteria..
         """
         self.metric = metric
 
@@ -347,13 +319,8 @@ class StopCriteria(object):
         """
         return self.metric
 
-    def set_stop(self, stop=False):
-        """
-        Set the stop status
-        """
-        self.stop = False
 
-    def compute(self, region, image=None):
+    def compute(self, region, image, threshold=None):
         """
         compute the metric of region according to the region and judge whether the metric meets the stop threshold
 
@@ -363,91 +330,59 @@ class StopCriteria(object):
             The numpy array to represent 2d/3d/4d image to be segmented.
         region: Region object
             It represents the current region and associated attributes
+        threshold: float, optional
+            The default is None which means the adaptive method will be used.
 
         """
 
         if self.metric == 'size':
-            if region.get_label_size() >= self.threshold:
+            if region.label_size() >= threshold:
                 self.stop = True
 
-    def isstop(self):
+    def stop(self):
+
         return self.stop
+
+    def reset_stop(self):
+        """
+        Reset the stop signal
+        """
+        self.stop = False
 
 
 class SeededRegionGrowing(object):
     """
-    Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeds.
-
+    Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeded region.
 
     Attributes
     ----------
-    image: numpy 2d/3d/4d array
-        The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first three dimension is spatial dimension and
-        the fourth dimension is time or feature dimension
-    seeds: Seeds object
-        The seeds at which region growing begin
     similarity_criteria: SimilarityCriteria object
         The similarity criteria which control the neighbor to merge to the region
     stop_criteria: StopCriteria object
         The stop criteria which control when the region growing stop
-    neighbor: SpatialNeighbor object
-        The neighbor generator which generate the spatial neighbor(coordinates)for a point
 
     Methods
     -------
-    grow()
+    compute(region,image)
         do region growing
 
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor):
+    def __init__(self, similarity_criteria, stop_criteria):
         """
         Initialize the object
 
         Parameters
         ----------
-        image: numpy.array
-            a 2d/3d/4d image to be segmented
-        seeds: class Seeds
-            The seeds at which region growing begin
         similarity_criteria: class SimilarityCriteria
             The similarity criteria which control the neighbor to merge to the region
         stop_criteria: class StopCriteria
             The stop criteria which control when the region growing stop
-        neighbor:class SpatialNeighbor
-            The neighbor generator which generate the spatial neighbor(coordinates)for a point
 
         """
 
-        if 2 <= len(image.shape) <= 4:
-            self.image = image
-        else:
-            raise ValueError("Target image must be a 2D/3D/4D array.")
-
-        self.seeds = seeds
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
-        self.neighbor = neighbor
-
-        # initialize the region
-        region_label = self.seeds.coords
-        region_neighbor = self.neighbor.compute(region_label)  # compute the neighbor for the current region(label)
-        self.region = Region(region_label, region_neighbor)
-
-
-    def set_image(self, image):
-        self.image = image
-
-    def get_image(self):
-        return self.image
-
-    def set_seeds(self, seeds):
-        self.seeds = seeds
-        self.region.set_label(self.seeds.get_coords())
-        self.region.set_neighbor(self.neighbor.compute(self.seeds.get_coords()))
-
-    def get_seeds(self):
-        return self.seeds
 
     def set_stop_criteria(self, stop_criteria):
         """
@@ -461,17 +396,6 @@ class SeededRegionGrowing(object):
         """
         return self.stop_criteria
 
-    def set_neighbor(self, neighbor):
-        """
-        Set the connectivity.
-        """
-        self.neighbor = neighbor
-
-    def get_neighbor(self):
-        """
-        Get the connectivity.
-        """
-        return self.neighbor
 
     def set_similarity_criteria(self, similarity_criteria):
         """
@@ -485,48 +409,50 @@ class SeededRegionGrowing(object):
         """
         return self.similarity_criteria
 
-    def set_region(self, region):
-        """
-        Set the region sequence.
-        """
-        self.region = region
 
-    def get_region(self):
-        """
-        Get the region sequence..
-        """
-        return self.region
-
-    def grow(self):
+    def compute(self, region, image, threshold):
         """
          Region grows based on the attributes seeds,similarity and stop criterion
 
-         Returns
-         -------
-         region: Region object
+        Parameters
+        ----------
+        region: Region object
+            seeded region for growing
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
+            and the 4th dimension is time or feature dimension
+
+        Returns
+        -------
+            region: Region object
 
         """
 
-        while not self.stop_criteria.isstop():
-            # find the nearest neighbor for the current region
-            nearest_neighbor = self.similarity_criteria.compute(self.region, self.image)
-            nearest_neighbor = nearest_neighbor.reshape((1, -1))
+        regions = []
+        for thr in threshold:
+            while not self.stop_criteria.stop():
+                # find the nearest neighbor for the current region
+                nearest_neighbor = self.similarity_criteria.compute(region, image)
+                nearest_neighbor = nearest_neighbor.reshape((1, -1))
 
-            # add the nearest neighbor to the region
-            self.region.add_label(nearest_neighbor)
+                # add the nearest neighbor to the region
+                region.add_label(nearest_neighbor)
 
-            # remove the nearest neighbor from the current neighbor
-            self.region.remove_neighbor(nearest_neighbor)
+                # remove the nearest neighbor from the current neighbor
+                region.remove_neighbor(nearest_neighbor)
 
-            # compute the neighbor of the new added voxels and put it into the current neighbor
-            self.region.add_neighbor(self.neighbor.compute(nearest_neighbor))
+                # compute the neighbor of the new added pixel and put it into the current neighbor
+                region.add_neighbor(nearest_neighbor)
 
-            # Update the stop criteria
-            self.stop_criteria.compute(self.region, self.image)
+                # Update the stop criteria
+                self.stop_criteria.compute(region, image, thr)
 
-            #print self.region.label.shape
+                #print self.region.label.shape
 
-        return self.region
+            regions.append(copy.copy(region))
+            self.stop_criteria.reset_stop()
+
+        return regions
 
 
 class Aggregator(object):
@@ -655,25 +581,7 @@ class RandomSRG(object):
             raise ValueError("The  seed_sampling_num must be a positive int")
 
 
-    def seed_sampling(self):
-        """
-        Randomly sample coordinates from the initial coordinates.
-        In each sampling, only one coordinate from each group of seeds will be sampled
-
-        """
-
-        seed_coords = self.srg.get_seeds().get_coords()
-
-        if self.seed_sampling_num > 0:
-            sampling_coords = seed_coords[np.random.choice(seed_coords.shape[0], self.seed_sampling_num, replace=True),
-                              :]
-        else:
-            sampling_coords = seed_coords
-
-        return sampling_coords
-
-
-    def grow(self):
+    def compute(self, region, image, thres):
         """
         Aggregation for different regions
 
@@ -747,29 +655,6 @@ class Optimizer(object):
             raise ValueError("The Type of aggregator should be 'PC' and 'AC'.")
 
 
-class AdaptiveSRG(object):
-    """
-    Adaptive seeded region growing.
-    """
-
-    def __init__(self, srg, threshold, optimizer=None):
-        self.srg = srg
-        self.threshold = threshold
-        self.optimizer = optimizer
-
-    def grow(self):
-        """
-        Adaptive region growing.
-        """
-        regions = []
-        for t in self.threshold:
-            self.srg.get_stop_criteria().set_threshod(t)
-            regions.append(copy.copy(self.srg.grow()))
-            self.srg.get_stop_criteria().set_stop(False)
-
 
 if __name__ == "__main__":
-    seedcoords = (((1, 2, 3), (3, 2, 1)), ((4, 5, 6), (6, 5, 1)))
-    seeds3d = Seeds(seedcoords)
-    print seeds3d.get_coords()
-
+    pass
