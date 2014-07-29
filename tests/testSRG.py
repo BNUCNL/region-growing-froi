@@ -8,9 +8,9 @@ if __name__ == "__main__":
     mask = nib.load("../data/prior/prob_rFFA.nii.gz")
     mask = mask.get_data()
 
-    seed_coords = np.array(np.nonzero(mask >= 0.6))
+    seed_coords = np.array(np.nonzero(mask >= 0.6)).T
     neighbor_element = SpatialNeighbor('connected', mask.shape, 26)
-    region = Region(seed_coords.T, neighbor_element)
+    region = Region(seed_coords, neighbor_element)
 
     similarity_criteria = SimilarityCriteria('euclidean', 0.8)
     stop_criteria = StopCriteria('size')
@@ -19,14 +19,14 @@ if __name__ == "__main__":
     affine = image.get_affine()
     image = image.get_data()
 
-    #srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
-    #threshold = np.array((10,50))
-    #region = srg.compute(region, image, threshold)
+    srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
+    threshold = np.array((10, 50))
+    srg_region = srg.compute(region, image, threshold)
 
     similarity_criteria.set_rand_neighbor_prop(0.7)
-    rsrg = RandomSRG(similarity_criteria, stop_criteria, 10)
-    threshold = np.array((10, 50))
-    rsrg.compute(region, image, threshold)
+    seed_sampling_num = 10
+    rsrg = RandomSRG(similarity_criteria, stop_criteria, seed_sampling_num)
+    rsrg_region = rsrg.compute(region, image, threshold)
 
 
 
