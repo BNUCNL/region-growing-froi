@@ -1,3 +1,5 @@
+import copy
+
 from scipy.spatial import distance
 
 from algorithm.neighbor import *
@@ -82,6 +84,7 @@ class Region(object):
 
         self.label = label
         self.neighbor = neighbor
+        self.boundary = None
 
 
     def set_label(self, label):
@@ -166,17 +169,26 @@ class Region(object):
         idx = np.nonzero(utils.in2d(self.neighbor, label))[0]
         self.neighbor = np.delete(self.neighbor, idx, 0)
 
-
-    def compute_boundary(self):
+    def compute_boundary(self, spatial_neighbor):
 
         """
             Compute the  boundary for the label
         """
 
-    #Do something here.
+        boundary = np.zeros(self.label.shape[0])
+        for v in range(self.label.shape[0]):
+            nb = spatial_neighbor.compute(self.label[v, :])
+            if not np.all(utils.in2d(nb, self.label)):
+                boundary[v] = True
 
-    pass
+        self.boundary = self.label[boundary, :]
 
+    def get_boundary(self):
+        """
+        Get the boundary for the label
+        """
+
+        return self.boundary
 
 
 class SimilarityCriteria:
@@ -307,7 +319,7 @@ class StopCriteria(object):
         """
         Parameters
         ----------
-        threshold: float
+        threshold: numpy 1d array  or a list or a tuple
             The default is None which means the adaptive method will be used.
         criteria_metric: str, optional
             A description for the metric type. The supported types include 'homogeneity','size','gradient'.
@@ -316,6 +328,10 @@ class StopCriteria(object):
         """
 
         self.metric = criteria_metric
+
+        if not isinstance(threshold, np.ndarray):
+            threshold = np.array(threshold)
+
         self.threshold = threshold
         self.stop = False
 
@@ -332,6 +348,9 @@ class StopCriteria(object):
         return self.metric
 
     def set_stop(self, stop=False):
+        """
+        Set the stop status
+        """
         self.stop = False
 
     def compute(self, region, image=None):
@@ -342,8 +361,8 @@ class StopCriteria(object):
         ----------
         image: numpy 2d/3d/4d array
             The numpy array to represent 2d/3d/4d image to be segmented.
-        region: class Region
-            represent the current region and associated attributes
+        region: Region object
+            It represents the current region and associated attributes
 
         """
 
@@ -409,7 +428,11 @@ class SeededRegionGrowing(object):
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
         self.neighbor = neighbor
-        self.region = None
+
+        # initialize the region
+        region_label = self.seeds.coords
+        region_neighbor = self.neighbor.compute(region_label)  # compute the neighbor for the current region(label)
+        self.region = Region(region_label, region_neighbor)
 
 
     def set_image(self, image):
@@ -420,6 +443,8 @@ class SeededRegionGrowing(object):
 
     def set_seeds(self, seeds):
         self.seeds = seeds
+        self.region.set_label(self.seeds.get_coords())
+        self.region.set_neighbor(self.neighbor.compute(self.seeds.get_coords()))
 
     def get_seeds(self):
         return self.seeds
@@ -481,10 +506,6 @@ class SeededRegionGrowing(object):
          region: Region object
 
         """
-        # initialize the region
-        region_label = self.seeds.coords
-        region_neighbor = self.neighbor.compute(region_label)  # compute the neighbor for the current region(label)
-        self.region = Region(region_label, region_neighbor)
 
         while not self.stop_criteria.isstop():
             # find the nearest neighbor for the current region
@@ -586,7 +607,7 @@ class Aggregator(object):
         return agg_image
 
 
-class RandomSRG(SeededRegionGrowing):
+class RandomSRG(object):
     """
     Seeded region growing based on random seeds.
 
@@ -613,28 +634,20 @@ class RandomSRG(SeededRegionGrowing):
 
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor, seed_sampling_num):
+    def __init__(self, srg, seed_sampling_num, aggregator=None):
         """
 
         Parameters
         ----------
-        image: numpy.array
-            a 2d/3d/4d image to be segmentated
-        seeds: Seeds object
-            The seeds at which region growing begin
-        similarity_criteria: SimilarityCriteria object
-            The similarity criteria which control the neighbor to merge to the region
-        stop_criteria: StopCriteria object
-            The stop criteria which control when the region growing stop
-        neighbor: SpatialNeighbor object
-            The neighbor generator which generate the spatial neighbor(coordinates)for a point
+        srg: SeedRegionGrowing object
         seed_sampling_num: int, optional
            The random sampling number for seeds
+        aggregator: Aggregator object
 
         """
 
-        super(RandomSRG, self).__init__(image, seeds, similarity_criteria, stop_criteria, neighbor)
-        #self.aggregator = aggregator
+        self.srg = srg
+        self.aggregator = aggregator
 
         if seed_sampling_num >= 0:
             self.seed_sampling_num = seed_sampling_num
@@ -649,7 +662,7 @@ class RandomSRG(SeededRegionGrowing):
 
         """
 
-        seed_coords = self.seeds.get_coords()
+        seed_coords = self.srg.get_seeds().get_coords()
 
         if self.seed_sampling_num > 0:
             sampling_coords = seed_coords[np.random.choice(seed_coords.shape[0], self.seed_sampling_num, replace=True),
@@ -673,9 +686,9 @@ class RandomSRG(SeededRegionGrowing):
         rand_coords = self.seed_sampling()
         regions = []
         for seed in rand_coords:
-            self.seeds.set_coords(seed.reshape((1, -1)))
-            regions.append(super(RandomSRG, self).grow())
-            self.stop_criteria.set_stop()
+            self.srg.set_seeds(Seeds(seed.reshape((1, -1))))
+            regions.append(copy.copy(self.srg.grow()))
+            self.srg.get_stop_criteria().set_stop(False)
 
         #region = self.aggregator.compute(regions, self.image)
 
@@ -705,13 +718,15 @@ class Optimizer(object):
             default is PC.
         """
 
+        self.opt_type = opt_type
+
     def compute(self, region, image):
         """
         Find the optimal segmentation according to the specified optimization criteria
 
         Parameters
         ----------
-        region: A list of regions.
+        region: A list of region object
             A set of regions to be aggregated
         image: numpy 2d/3d/4d/ array
             image to be  segmented.
@@ -719,26 +734,38 @@ class Optimizer(object):
         """
 
         if self.opt_type == 'PC':
-            pass
+            bound_val = np.mean(image[region.boundary[:, 0], region.boundary[:, 1], region.boundary[:, 2]])
+            per_val = np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1], region.neighbor[:, 2]])
 
+            contrast = (bound_val - per_val) / (bound_val + per_val)
+        elif self.opt_type == 'AC':
+            region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+            per_val = np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1], region.neighbor[:, 2]])
+
+            contrast = (region_val - per_val) / (region_val + per_val)
         else:
-            raise ValueError("The Type of aggregator should be 'DA', 'MWA', and 'HWA'.")
+            raise ValueError("The Type of aggregator should be 'PC' and 'AC'.")
 
 
-class AdaptiveSRG(SeededRegionGrowing):
+class AdaptiveSRG(object):
     """
     Adaptive seeded region growing.
     """
 
-    def __init__(self, image, seeds, similarity_criteria, stop_criteria, neighbor):
-        super(AdaptiveSRG, self).__init__(image, seeds, similarity_criteria, stop_criteria, neighbor)
-        # self.optimizer = optimizer
-
+    def __init__(self, srg, threshold, optimizer=None):
+        self.srg = srg
+        self.threshold = threshold
+        self.optimizer = optimizer
 
     def grow(self):
         """
         Adaptive region growing.
         """
+        regions = []
+        for t in self.threshold:
+            self.srg.get_stop_criteria().set_threshod(t)
+            regions.append(copy.copy(self.srg.grow()))
+            self.srg.get_stop_criteria().set_stop(False)
 
 
 if __name__ == "__main__":
