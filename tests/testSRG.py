@@ -5,7 +5,7 @@ from algorithm.neighbor import *
 
 
 if __name__ == "__main__":
-    mask = nib.load("../data/prob_rFFA.nii.gz")
+    mask = nib.load("../data/prior/prob_rFFA.nii.gz")
     mask = mask.get_data()
 
     seed_coords = np.array(np.nonzero(mask >= 0.6))
