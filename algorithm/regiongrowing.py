@@ -35,7 +35,7 @@ class Region(object):
         """
 
         if not isinstance(seed, np.ndarray):
-            raise ValueError("The seed must be a ndarray. ")
+            seed = np.array(seed)
 
         self.seed = seed
         self.neighbor_element = neighbor_element
@@ -49,6 +49,9 @@ class Region(object):
         """
 
         self.seed = seed
+        if seed.ndim == 1:
+            seed = seed.reshape((1, -1))
+
         self.neighbor = self.neighbor_element.compute(seed)
 
     def get_seed(self):
@@ -64,7 +67,7 @@ class Region(object):
 
         """
         if sampling_num > 0:
-            sampling_seeds = self.seed[np.random.choice(self.seed.shape[0], sampling_num, replace=True), :]
+            sampling_seed = self.seed[np.random.choice(self.seed.shape[0], sampling_num, replace=True), :]
         else:
             sampling_seed = self.seed
 
@@ -107,7 +110,8 @@ class Region(object):
             Each row represents the coordinates for a pixels
         """
 
-        self.label = np.append(self.label, label, axis=0)
+        self.label = np.array(self.label.tolist() + label.tolist())
+
 
     def get_label(self):
         """
@@ -132,9 +136,10 @@ class Region(object):
             Each row represents the coordinates for  a pixels
         """
 
+        neighbor = self.neighbor_element.compute(neighbor)
+
         # find the neighbor which have been in neighbor or in label list
-        marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
-                               utils.in2d(neighbor, self.label))
+        marked = np.logical_or(utils.in2d(neighbor, self.neighbor), utils.in2d(neighbor, self.label))
 
         # delete the marked neighbor
         neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
@@ -245,8 +250,8 @@ class SimilarityCriteria:
 
         """
 
-        lsize = region.get_label_size()
-        nsize = region.get_neighbor_size()
+        lsize = region.label_size()
+        nsize = region.neighbor_size()
 
         if self.rand_neighbor_prop == 1:
             nbidx = np.arange(nsize)
@@ -339,7 +344,7 @@ class StopCriteria(object):
             if region.label_size() >= threshold:
                 self.stop = True
 
-    def stop(self):
+    def isstop(self):
 
         return self.stop
 
@@ -430,7 +435,7 @@ class SeededRegionGrowing(object):
 
         regions = []
         for thr in threshold:
-            while not self.stop_criteria.stop():
+            while not self.stop_criteria.isstop():
                 # find the nearest neighbor for the current region
                 nearest_neighbor = self.similarity_criteria.compute(region, image)
                 nearest_neighbor = nearest_neighbor.reshape((1, -1))
@@ -447,10 +452,8 @@ class SeededRegionGrowing(object):
                 # Update the stop criteria
                 self.stop_criteria.compute(region, image, thr)
 
-                #print self.region.label.shape
-
             regions.append(copy.copy(region))
-            self.stop_criteria.reset_stop()
+            self.stop_criteria.set_stop()
 
         return regions
 
@@ -501,8 +504,6 @@ class Aggregator(object):
             shape = (image.shape[0], image.shape[1], image.shape[2], len(region))
         else:
             raise ValueError("Wrong image dimension")
-
-        print len(region)
 
         region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
         weight = np.ones(len(region))
