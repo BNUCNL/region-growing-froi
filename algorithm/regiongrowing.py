@@ -463,7 +463,7 @@ class SeededRegionGrowing(object):
             regions.append(copy.copy(region))
             self.stop_criteria.set_stop()
 
-        return [regions]
+        return regions
 
 
 class RandomSRG(SeededRegionGrowing):
