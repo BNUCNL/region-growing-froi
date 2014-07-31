@@ -168,7 +168,7 @@ class Region(object):
         idx = np.nonzero(utils.in2d(self.neighbor, label))[0]
         self.neighbor = np.delete(self.neighbor, idx, 0)
 
-    def compute_boundary(self, spatial_neighbor):
+    def compute_boundary(self):
 
         """
             Compute the  boundary for the label
@@ -176,7 +176,7 @@ class Region(object):
 
         boundary = np.zeros(self.label.shape[0])
         for v in range(self.label.shape[0]):
-            nb = spatial_neighbor.compute(self.label[v, :])
+            nb = self.neighbor_element.compute(self.label[v, :])
             if not np.all(utils.in2d(nb, self.label)):
                 boundary[v] = True
 
@@ -315,8 +315,9 @@ class StopCriteria(object):
             Default is 'size'
 
         """
+        if criteria_metric == 'size' or criteria_metric == 'homogeneity' or criteria_metric == 'gradient':
+            self.metric = criteria_metric
 
-        self.metric = criteria_metric
         self.stop = stop
 
     def set_metric(self, metric):
@@ -515,19 +516,19 @@ class Aggregator(object):
             if self.agg_type == 'UWA':
                 for r in range(len(region)):
                     label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
+                    region_image[label[:, 0], label[:, 1], r] = 1
 
             elif self.agg_type == 'MWA':
                 for r in range(len(region)):
                     label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
-                    weight[r] = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
+                    region_image[label[:, 0], label[:, 1], r] = 1
+                    weight[r] = np.mean(image[label[:, 0], label[:, 1]])
 
             elif self.agg_type == 'HWA':
                 for r in range(len(region)):
                     label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
-                    weight[r] = np.std(image[label[:, 0], label[:, 1], label[:, 2]])
+                    region_image[label[:, 0], label[:, 1], r] = 1
+                    weight[r] = np.std(image[label[:, 0], label[:, 1]])
 
             weight = weight / weight.sum()
             agg_image = np.average(region_image, axis=2, weights=weight)
