@@ -43,17 +43,17 @@ class Region(object):
         self.label = seed
         self.neighbor = neighbor_element.compute(seed)
 
-
     def set_seed(self, seed):
         """
         set the coordinates of the seeds
         """
+        if not isinstance(seed, np.ndarray):
+            seed = np.array(seed)
 
         self.seed = seed
-        if seed.ndim == 1:
-            seed = seed.reshape((1, -1))
-
+        self.label = seed
         self.neighbor = self.neighbor_element.compute(seed)
+        #print seed.shape[0], self.neighbor.shape[0]
 
     def get_seed(self):
         """
@@ -110,9 +110,12 @@ class Region(object):
         neighbor: numpy 2d array
             Each row represents the coordinates for a pixels
         """
+        self.label = np.append(self.label, label, axis=0)
 
         #self.label = np.array(self.label.tolist() + label.tolist())
-        self.label = np.append(self.label, label, axis=0)
+        #self.label = np.array(np.append(self.label, label, axis=0).tolist())
+
+        # print 'label', self.label.shape[0]
 
 
     def get_label(self):
@@ -140,9 +143,12 @@ class Region(object):
 
         neighbor = self.neighbor_element.compute(neighbor)
 
-
         # find the neighbor which have been in neighbor or in label list
-        marked = np.logical_or(utils.in2d(neighbor, self.neighbor), utils.in2d(neighbor, self.label))
+        #marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
+        #                       utils.in2d(neighbor, self.label))
+
+        # marked = utils.in2d(neighbor, self.neighbor)
+        marked = utils.in2d(neighbor, self.label)
 
         # delete the marked neighbor
         neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
@@ -280,7 +286,8 @@ class SimilarityCriteria:
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
             dist = distance.cdist(region_val, neighbor_val, self.metric)
 
-        return region.neighbor[nbidx[dist.argmin()], :]
+        nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
+        return nearest_neighbor.reshape((-1, 3))
 
 
 class StopCriteria(object):
@@ -432,7 +439,8 @@ class SeededRegionGrowing(object):
 
         Returns
         -------
-            region: Region object
+            region: a list of region object
+                The regions are generated for each threshold, one region for one threshold
 
         """
 
@@ -441,7 +449,6 @@ class SeededRegionGrowing(object):
             while not self.stop_criteria.isstop():
                 # find the nearest neighbor for the current region
                 nearest_neighbor = self.similarity_criteria.compute(region, image)
-                nearest_neighbor = nearest_neighbor.reshape((1, -1))
 
                 # add the nearest neighbor to the region
                 region.add_label(nearest_neighbor)
@@ -582,14 +589,15 @@ class RandomSRG(SeededRegionGrowing):
 
         Returns
         -------
-        regions:  a list of Region object
+        regions:  a 2D list of Region object
+            The regions are generated for each seed and each threshold. As a result, regions are a 2D list.
+            The first dim is for seeds, and the second dim is for threshold
 
         """
         regions = []
         coords = region.seed_sampling(self.seed_sampling_num)
-
         for seed in coords:
-            region.set_seed(seed)
+            region.set_seed(seed.reshape((-1, 3)))
             reg = super(RandomSRG, self).compute(region, image, threshold)
             regions.append(copy.copy(reg))
             self.stop_criteria.set_stop()
