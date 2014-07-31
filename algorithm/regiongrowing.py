@@ -463,103 +463,8 @@ class SeededRegionGrowing(object):
             regions.append(copy.copy(region))
             self.stop_criteria.set_stop()
 
-        return regions
+        return [regions]
 
-
-class Aggregator(object):
-    """
-    Aggregator for a set of regions.
-
-    Attributes
-    ----------
-    aggr_type:  str, optional
-        Description for the method to  aggregate the regions. Supported methods include
-        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
-        default is DA.
-    """
-
-    def __init__(self, agg_type='UWA'):
-        """
-        Parameters
-        ----------
-        aggr_type:  str, optional
-        Description for the method to  aggregate the regions. Supported methods include
-        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
-        default is UWA.
-        """
-        if agg_type == 'UWA' or agg_type == 'MWA' or agg_type == 'HWA':
-            self.agg_type = agg_type
-        else:
-            raise ValueError("The Type of aggregator should be 'UWA', 'MWA', and 'HWA'.")
-
-    def compute(self, region, image):
-        """
-        Aggregate a set of regions
-
-        Parameters
-        ----------
-        region: A list of regions.
-            A set of regions to be aggregated
-        image: numpy 2d/3d/4d/ array
-            image to be  segmented.
-
-        Returns
-        -------
-        agg_image: numpy 2d/3d array
-            Final segmentation from aggregating a set of regions
-
-        """
-        agg_image = []
-        if image.ndim == 2:
-            region_image = np.zeros((image.shape[0], image.shape[1], len(region)), dtype=int)
-            weight = np.ones(len(region))
-            if self.agg_type == 'UWA':
-                for r in range(len(region)):
-                    label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], r] = 1
-
-            elif self.agg_type == 'MWA':
-                for r in range(len(region)):
-                    label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], r] = 1
-                    weight[r] = np.mean(image[label[:, 0], label[:, 1]])
-
-            elif self.agg_type == 'HWA':
-                for r in range(len(region)):
-                    label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], r] = 1
-                    weight[r] = np.std(image[label[:, 0], label[:, 1]])
-
-            weight = weight / weight.sum()
-            agg_image = np.average(region_image, axis=2, weights=weight)
-
-        elif image.ndim == 3:
-            region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
-            weight = np.ones(len(region))
-            if self.agg_type == 'UWA':
-                for r in range(len(region)):
-                    label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
-
-            elif self.agg_type == 'MWA':
-                for r in range(len(region)):
-                    label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
-                    weight[r] = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
-
-            elif self.agg_type == 'HWA':
-                for r in range(len(region)):
-                    label = region[r].get_label()
-                    region_image[label[:, 0], label[:, 1], label[:, 2], r] = 1
-                    weight[r] = np.std(image[label[:, 0], label[:, 1], label[:, 2]])
-
-            weight = weight / weight.sum()
-            agg_image = np.average(region_image, axis=3, weights=weight)
-
-        elif image.ndim == 4:
-            pass
-
-        return agg_image
 
 class RandomSRG(SeededRegionGrowing):
     """
@@ -624,6 +529,129 @@ class RandomSRG(SeededRegionGrowing):
         return regions
 
 
+class Aggregator(object):
+    """
+    Aggregator for a set of regions.
+
+    Attributes
+    ----------
+    aggr_type:  str, optional
+        Description for the method to  aggregate the regions. Supported methods include
+        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
+        default is DA.
+    """
+
+    def __init__(self, agg_type='UWA'):
+        """
+        Parameters
+        ----------
+        aggr_type:  str, optional
+        Description for the method to  aggregate the regions. Supported methods include
+        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
+        default is UWA.
+        """
+        if agg_type == 'UWA' or agg_type == 'MWA' or agg_type == 'HWA':
+            self.agg_type = agg_type
+        else:
+            raise ValueError("The Type of aggregator should be 'UWA', 'MWA', and 'HWA'.")
+
+    def compute(self, region, image):
+        """
+        Aggregate a set of regions
+
+        Parameters
+        ----------
+        region: A list of regions.
+            A set of regions to be aggregated
+        image: numpy 2d/3d/4d/ array
+            image to be  segmented.
+
+        Returns
+        -------
+        agg_image: numpy 2d/3d array
+            Final segmentation from aggregating a set of regions
+
+        """
+
+        if image.ndim == 2:
+            agg_image = np.zeros((image.shape[0], image.shape[1], len(region)), dtype=int)
+            region_image = np.zeros((image.shape[0], image.shape[1], len(region[0])), dtype=int)
+            weight = np.ones(len(region[0]))
+
+            if self.agg_type == 'UWA':
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        region_image[label[:, 0], label[:, 1], j] = 1
+
+                    weight = weight / weight.sum()
+                    agg_image[:, :, i] = np.average(region_image, axis=2, weights=weight)
+                    region_image[:] = 0
+
+            elif self.agg_type == 'MWA':
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        region_image[label[:, 0], label[:, 1], j] = 1
+                        weight[j] = np.mean(image[label[:, 0], label[:, 1]])
+
+                    weight = weight / weight.sum()
+                    agg_image[:, :, i] = np.average(region_image, axis=2, weights=weight)
+                    region_image[:] = 0
+
+            elif self.agg_type == 'HWA':
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        region_image[label[:, 0], label[:, 1], j] = 1
+                        weight[j] = np.std(image[label[:, 0], label[:, 1]])
+
+                    weight = weight / weight.sum()
+                    agg_image[:, :, i] = np.average(region_image, axis=2, weights=weight)
+                    region_image[:] = 0
+
+        elif image.ndim == 3:
+            agg_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
+            region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
+            weight = np.ones(len(region))
+            if self.agg_type == 'UWA':
+                for i in range(len(region)):
+                    for j in range(region[0]):
+                        label = region[i][j].get_label()
+                        region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
+
+                    weight = weight / weight.sum()
+                    agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
+                    region_image[:] = 0
+
+            elif self.agg_type == 'MWA':
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
+                        weight[j] = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
+
+                    weight = weight / weight.sum()
+                    agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
+                    region_image[:] = 0
+
+            elif self.agg_type == 'HWA':
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
+                        weight[j] = np.std(image[label[:, 0], label[:, 1], label[:, 2]])
+
+                    weight = weight / weight.sum()
+                    agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
+                    region_image[:] = 0
+
+        elif image.ndim == 4:
+            pass
+
+        return agg_image
+
+
 class Optimizer(object):
     """
     Optimizer to select the optimal segmentation from a set of region growing results.
@@ -665,32 +693,44 @@ class Optimizer(object):
 
         """
 
-        con_val = np.zeros(len(region))
+        con_val = np.zeros(len(region), len(region[0]))
         if image.ndim == 2:
             if self.opt_type == 'PC':
                 for i in range(len(region)):
-                    bound_val = np.mean(image[region.boundary[:, 0], region.boundary[:, 1]])
-                    per_val = np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1]])
-                    con_val[i] = (bound_val - per_val) / (bound_val + per_val)
+                    for j in range(len(region[0])):
+                        bound = region[i][j].compute_boundary()
+                        neighbor = region[i][j].get_neighbor()
+                        bound_val = np.mean(image[bound[:, 0], bound[:, 1]])
+                        per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1]])
+                        con_val[i, j] = (bound_val - per_val) / (bound_val + per_val)
 
             elif self.opt_type == 'AC':
                 for i in range(len(region)):
-                    region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
-                    per_val = np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1]])
-                    con_val[i] = (region_val - per_val) / (region_val + per_val)
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        neighbor = region[i][j].get_neighbor()
+                        region_val = np.mean(image[label[:, 0], label[:, 1]])
+                        per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1]])
+                        con_val[i, j] = (region_val - per_val) / (region_val + per_val)
 
         elif image.ndim == 3:
             if self.opt_type == 'PC':
                 for i in range(len(region)):
-                    bound_val = np.mean(image[region.boundary[:, 0], region.boundary[:, 1], region.boundary[:, 2]])
-                    per_val = np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1], region.neighbor[:, 2]])
-                    con_val[i] = (bound_val - per_val) / (bound_val + per_val)
+                    for j in range(len(region[0])):
+                        bound = region[i][j].compute_boundary()
+                        neighbor = region[i][j].get_neighbor()
+                        bound_val = np.mean(image[bound[:, 0], bound[:, 1], bound[:, 2]])
+                        per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1], neighbor[:, 2]])
+                        con_val[i, j] = (bound_val - per_val) / (bound_val + per_val)
 
             elif self.opt_type == 'AC':
                 for i in range(len(region)):
-                    region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
-                    per_val = np.mean(image[region.neighbor[:, 0], region.neighborl[:, 1], region.neighbor[:, 2]])
-                    con_val[i] = (region_val - per_val) / (region_val + per_val)
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
+                        neighbor = region[i][j].get_neighbor()
+                        region_val = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
+                        per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1], neighbor[:, 2]])
+                        con_val[i, j] = (region_val - per_val) / (region_val + per_val)
 
         elif image.ndim == 4:
             pass
