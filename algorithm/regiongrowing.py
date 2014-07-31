@@ -434,6 +434,9 @@ class SeededRegionGrowing(object):
         image: numpy 2d/3d/4d array
             The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
             and the 4th dimension is time or feature dimension
+        threshold: numpy 1d array, float
+            Stop thresholds for region growing
+
 
         Returns
         -------
@@ -508,6 +511,15 @@ class RandomSRG(SeededRegionGrowing):
         """
         Aggregation for different regions
 
+        Parameters
+        ----------
+        region: Region object
+            seeded region for growing
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
+            and the 4th dimension is time or feature dimension
+        threshold: a numpy nd array
+            Stop threshold for growing
 
         Returns
         -------
@@ -523,8 +535,6 @@ class RandomSRG(SeededRegionGrowing):
             reg = super(RandomSRG, self).compute(region, image, threshold)
             regions.append(copy.copy(reg))
             self.stop_criteria.set_stop()
-
-        #region = self.aggregator.compute(regions, self.image)
 
         return regions
 
@@ -561,8 +571,8 @@ class Aggregator(object):
 
         Parameters
         ----------
-        region: A list of regions.
-            A set of regions to be aggregated
+        region: A list of list of region objects to be aggregated..
+            A 2d lists. the first dimension is for seeds, the second dimension is for threshold
         image: numpy 2d/3d/4d/ array
             image to be  segmented.
 
@@ -686,11 +696,15 @@ class Optimizer(object):
 
         Parameters
         ----------
-        region: A list of region object
-            A set of regions to be aggregated
+        region: A 2d list of region object
+            A 2d lists. the first dimension is for seeds, the second dimension is for threshold
         image: numpy 2d/3d/4d/ array
             image to be  segmented.
 
+        Returns
+        ------
+        con_val: optimizing index
+          A index to measure the performance of the segmentation
         """
 
         con_val = np.zeros(len(region), len(region[0]))
