@@ -1,8 +1,9 @@
+import time
+
 import nibabel as nib
 
 from algorithm.regiongrowing import *
 from algorithm.neighbor import *
-
 
 if __name__ == "__main__":
     mask = nib.load("../data/prior/prob_rFFA.nii.gz")
@@ -19,16 +20,30 @@ if __name__ == "__main__":
     affine = image.get_affine()
     image = image.get_data()
 
-    srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
-    threshold = np.array((10, 50))
-    srg_region = srg.compute(region, image, threshold)
+    starttime = time.clock()
+
+    threshold = np.array((3, 5))
+
+    # srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
+    # srg_region = srg.compute(region, image, threshold)
+    #
+    #
+    # for i in range(len(srg_region)):
+    #          print i,srg_region[i].label.shape[0]
+
 
     similarity_criteria.set_rand_neighbor_prop(0.7)
     seed_sampling_num = 10
     rsrg = RandomSRG(similarity_criteria, stop_criteria, seed_sampling_num)
     rsrg_region = rsrg.compute(region, image, threshold)
 
+    for i in range(len(rsrg_region)):
+        for j in range(len(rsrg_region[i])):
+            print i, j, rsrg_region[i][j].label.shape[0]
 
+    endtime = time.clock()
+
+    print(endtime - starttime)
 
 
 
