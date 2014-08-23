@@ -39,7 +39,7 @@ def in2d(A, B):
     nrows, ncols = A.shape
     dtype = {'names': ['f{}'.format(i) for i in range(ncols)], 'formats': ncols * [A.dtype]}
 
-    C = np.in1d(A.view(dtype), B.view(dtype))
+    C = np.in1d(np.ascontiguousarray(A).view(dtype), np.ascontiguousarray(B).view(dtype))
 
     return C
 
@@ -54,7 +54,7 @@ def unique2d(A):
 
     Return
     ------
-    UA: the array only unique rows are holded
+    UA: the array only unique rows are left
     """
 
     B = np.ascontiguousarray(A).view(np.dtype((np.void, A.dtype.itemsize * A.shape[1])))
