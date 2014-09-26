@@ -174,9 +174,10 @@ class Region(object):
             Compute the  boundary for the label
         """
 
-        boundary = np.zeros(self.label.shape[0])
+        boundary = np.zeros(self.label.shape[0]).astype(np.False_)
         for v in range(self.label.shape[0]):
-            nb = self.neighbor_element.compute(self.label[v, :])
+            # nb = self.neighbor_element.compute(self.label[v, :])
+            nb = self.neighbor_element.compute(self.label[v, :].reshape(1, len(self.label[v, :])))
             if not np.all(utils.in2d(nb, self.label)):
                 boundary[v] = True
 
@@ -446,6 +447,7 @@ class SeededRegionGrowing(object):
         """
 
         regions = []
+        region = copy.copy(region)
         for thr in threshold:
             while not self.stop_criteria.isstop():
                 # find the nearest neighbor for the current region
@@ -707,7 +709,7 @@ class Optimizer(object):
           A index to measure the performance of the segmentation
         """
 
-        con_val = np.zeros(len(region), len(region[0]))
+        con_val = np.zeros((len(region), len(region[0])))
         if image.ndim == 2:
             if self.opt_type == 'PC':
                 for i in range(len(region)):
@@ -735,7 +737,10 @@ class Optimizer(object):
                         neighbor = region[i][j].get_neighbor()
                         bound_val = np.mean(image[bound[:, 0], bound[:, 1], bound[:, 2]])
                         per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1], neighbor[:, 2]])
-                        con_val[i, j] = (bound_val - per_val) / (bound_val + per_val)
+                        if (bound_val + per_val) == 0:
+                            con_val[i, j] = 0
+                        else:
+                            con_val[i, j] = (bound_val - per_val) / (bound_val + per_val)
 
             elif self.opt_type == 'AC':
                 for i in range(len(region)):
@@ -744,7 +749,10 @@ class Optimizer(object):
                         neighbor = region[i][j].get_neighbor()
                         region_val = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
                         per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1], neighbor[:, 2]])
-                        con_val[i, j] = (region_val - per_val) / (region_val + per_val)
+                        if (region_val + per_val) == 0:
+                            con_val[i, j] = 0
+                        else:
+                            con_val[i, j] = (region_val - per_val) / (region_val + per_val)
 
         elif image.ndim == 4:
             pass
