@@ -343,7 +343,7 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
     def set_wei_meth(self, wei_meth):
         """
-        Set weighted method.
+        Set weighted method: PB(probability based) or DB(distance based)
         """
 
         self.wei_meth = wei_meth
@@ -388,7 +388,21 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         if image.ndim == 2:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
-            dist = np.abs(region_val - neighbor_val)
+            neighbor_std = np.std(neighbor_val)
+
+            prior_region_val = np.mean(
+                prior_image[region.label[:lsize, 0], region.label[:lsize, 1]])
+            prior_neighbor_val = prior_image[
+                region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+            prior_neighbor_std = np.std(prior_neighbor_val)
+
+
+            #  The distance include data distance and prior distance
+            if self.wei_meth == 'PB':
+                dist = np.abs(region_val - neighbor_val) * prior_neighbor_val
+            else:
+                dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
+                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
 
         # compute distance for 3d image
         elif image.ndim == 3:
@@ -406,8 +420,7 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
                 dist = np.abs(region_val - neighbor_val) * prior_neighbor_val
             else:
                 dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
-                       prior_weight * np.abs(
-                           (prior_region_val - prior_neighbor_val) / prior_neighbor_std) * prior_weight
+                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
 
                 #np.exp()
 
