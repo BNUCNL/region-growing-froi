@@ -541,6 +541,93 @@ class RandomSRG(SeededRegionGrowing):
         return regions
 
 
+class PriorSRG(SeededRegionGrowing):
+    """
+    Seeded region growing with prior information
+
+    Attributes
+    ----------
+    similarity_criteria: SimilarityCriteria object
+        The similarity criteria which control the neighbor to merge to the region
+    stop_criteria: StopCriteria object
+        The stop criteria which control when the region growing stop
+    seed_sampling_num: int, optional
+        The sampling number for seed with replacement
+    prior_weight: weight for the prior
+    prior_image: image with prior information for each voxels
+
+    Methods
+    -------
+    computing(image,region,threshold)
+        Do region growing
+
+    """
+
+    def __init__(self, similarity_criteria, stop_criteria, seed_sampling_num, prior_image, prior_weight):
+        """
+        Initialize the object
+
+        Parameters
+        ----------
+        similarity_criteria: class SimilarityCriteria
+            The similarity criteria which control the neighbor to merge to the region
+        stop_criteria: class StopCriteria
+            The stop criteria which control when the region growing stop
+
+        """
+
+        self.similarity_criteria = similarity_criteria
+        self.stop_criteria = stop_criteria
+        self.seed_sampling_num = seed_sampling_num
+        self.prior_image = prior_image
+        self.prior_weight = prior_weight
+
+    def set_prior_image(self, prior_image):
+        """
+        Set prior image.
+        """
+
+        self.prior_image = prior_image
+
+    def set_prior_weight(self, prior_weight):
+        """
+        Set prior weight.
+        """
+        self.prior_weight = prior_weight
+
+
+    def compute(self, region, image, threshold):
+        """
+        Aggregation for different regions
+
+        Parameters
+        ----------
+        region: Region object
+            seeded region for growing
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
+            and the 4th dimension is time or feature dimension
+        threshold: a numpy nd array
+            Stop threshold for growing
+
+        Returns
+        -------
+        regions:  a 2D list of Region object
+            The regions are generated for each seed and each threshold. As a result, regions are a 2D list.
+            The first dim is for seeds, and the second dim is for threshold
+
+        """
+        regions = []
+        coords = region.seed_sampling(self.seed_sampling_num)
+        for seed in coords:
+            region.set_seed(seed.reshape((-1, 3)))
+            reg = super(RandomSRG, self).compute(region, image, threshold)
+            regions.append(copy.copy(reg))
+            self.stop_criteria.set_stop()
+
+        return regions
+
+
 class Aggregator(object):
     """
     Aggregator for a set of regions.
