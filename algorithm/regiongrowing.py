@@ -315,7 +315,7 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         wei_meth: weighted method for the prior,supporting probability based(PB) and distance based(DB) method
         """
 
-        super(SimilarityCriteria, self).__init__(metric, rand_neighbor_prop)
+        super(PriorBasedSimilarityCriteria, self).__init__(metric, rand_neighbor_prop)
 
         if wei_meth == 'PB' or wei_meth == 'DB':
             self.wei_meth = wei_meth
@@ -340,6 +340,22 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         """
 
         return self.prior_image
+
+    def set_prior_weight(self, prior_weight):
+        """
+        Set prior weight.
+        """
+
+        self.prior_weight = prior_weight
+
+
+    def get_prior_weight(self):
+        """
+        Get prior weight.
+        """
+
+        return self.prior_weight
+
 
     def set_wei_meth(self, wei_meth):
         """
@@ -417,12 +433,11 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
             prior_neighbor_std = np.std(prior_neighbor_val)
 
             if self.wei_meth == 'PB':
-                dist = np.abs(region_val - neighbor_val) * prior_neighbor_val
+                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
             else:
                 dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
                        prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
 
-                #np.exp()
 
         # compute distance for 4d image
         else:
