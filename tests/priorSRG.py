@@ -24,6 +24,7 @@ if __name__ == "__main__":
     similarity_criteria = PriorBasedSimilarityCriteria(prior_image)
     stop_criteria = StopCriteria('size')
 
+    # region size
     threshold = np.array((15, 30))
     starttime = time.clock()
 

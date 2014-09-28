@@ -399,7 +399,6 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-
         # compute distance for 2d image
         if image.ndim == 2:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
@@ -412,10 +411,9 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
                 region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
             prior_neighbor_std = np.std(prior_neighbor_val)
 
-
             #  The distance include data distance and prior distance
             if self.wei_meth == 'PB':
-                dist = np.abs(region_val - neighbor_val) * prior_neighbor_val
+                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
             else:
                 dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
                        prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
@@ -437,7 +435,6 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
             else:
                 dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
                        prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
-
 
         # compute distance for 4d image
         else:
