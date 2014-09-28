@@ -184,7 +184,7 @@ class Region(object):
         return self.label[boundary, :]
 
 
-class SimilarityCriteria:
+class SimilarityCriteria(object):
     """
     The object to compute the similarity between the labeled region and its neighbors
 
@@ -277,6 +277,164 @@ class SimilarityCriteria:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
             dist = np.abs(region_val - neighbor_val)
+
+        # compute distance for 4d image
+        else:
+            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
+            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+            dist = distance.cdist(region_val, neighbor_val, self.metric)
+
+        nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
+        return nearest_neighbor.reshape((-1, 3))
+
+
+class PriorBasedSimilarityCriteria(SimilarityCriteria):
+    """
+    The object to compute the similarity between the labeled region and its neighbors
+
+    Attributes
+    ----------l
+    metric: str,optional
+    A description for the metric type
+
+    Methods
+    ------
+    compute(region, image)
+        Do computing the similarity between the labeled region and its neighbors
+
+
+    """
+
+    def __init__(self, prior_image, wei_meth='PB', prior_weight=None, metric='educlidean', rand_neighbor_prop=1):
+        """
+        Parameters
+        -----------------------------------------------------
+        metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
+
+        wei_meth: weighted method for the prior,supporting probability based(PB) and distance based(DB) method
+        """
+
+        super(PriorBasedSimilarityCriteria, self).__init__(metric, rand_neighbor_prop)
+
+        if wei_meth == 'PB' or wei_meth == 'DB':
+            self.wei_meth = wei_meth
+        else:
+            raise ValueError("The weighted method should be 'PB(probability based)' or 'DB(distance based)'.")
+
+        self.prior_image = prior_image
+        self.prior_weight = prior_weight
+
+
+    def set_prior_image(self, prior_image):
+        """
+        Set prior image.
+        """
+
+        self.prior_image = prior_image
+
+
+    def get_prior_image(self):
+        """
+        Get prior image.
+        """
+
+        return self.prior_image
+
+    def set_prior_weight(self, prior_weight):
+        """
+        Set prior weight.
+        """
+
+        self.prior_weight = prior_weight
+
+
+    def get_prior_weight(self):
+        """
+        Get prior weight.
+        """
+
+        return self.prior_weight
+
+
+    def set_wei_meth(self, wei_meth):
+        """
+        Set weighted method: PB(probability based) or DB(distance based)
+        """
+
+        self.wei_meth = wei_meth
+
+    def get_wei_meth(self):
+        """
+        Get weighted method.
+        """
+
+        return self.wei_meth
+
+
+    def compute(self, region, image):
+        """
+        Compute the similarity between the labeled region and its neighbors.
+
+        Parameters
+        ----------
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented.
+        region: class Region
+            represent the current region and associated attributes
+
+        """
+
+        lsize = region.label_size()
+        nsize = region.neighbor_size()
+
+        prior_weight = self.get_prior_weight();
+        prior_image = self.get_prior_image();
+
+        if image.shape != self.prior_image.shape:
+            raise ValueError("The image shape should match the prior image shape. ")
+
+        if self.rand_neighbor_prop == 1:
+            nbidx = np.arange(nsize)
+        else:
+            nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
+
+        # compute distance for 2d image
+        if image.ndim == 2:
+            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
+            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+            neighbor_std = np.std(neighbor_val)
+
+            prior_region_val = np.mean(
+                prior_image[region.label[:lsize, 0], region.label[:lsize, 1]])
+            prior_neighbor_val = prior_image[
+                region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+            prior_neighbor_std = np.std(prior_neighbor_val)
+
+            #  The distance include data distance and prior distance
+            if self.wei_meth == 'PB':
+                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
+            else:
+                dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
+                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
+
+        # compute distance for 3d image
+        elif image.ndim == 3:
+            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
+            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+            neighbor_std = np.std(neighbor_val)
+
+            prior_region_val = np.mean(
+                prior_image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
+            prior_neighbor_val = prior_image[
+                region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+            prior_neighbor_std = np.std(prior_neighbor_val)
+
+            if self.wei_meth == 'PB':
+                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
+            else:
+                dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
+                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
 
         # compute distance for 4d image
         else:
@@ -539,6 +697,8 @@ class RandomSRG(SeededRegionGrowing):
             self.stop_criteria.set_stop()
 
         return regions
+
+
 
 
 class Aggregator(object):

@@ -1,3 +1,5 @@
+__author__ = 'zhenzonglei'
+
 import time
 
 import nibabel as nib
@@ -20,17 +22,9 @@ if __name__ == "__main__":
     affine = image.get_affine()
     image = image.get_data()
 
-    starttime = time.clock()
-
     threshold = np.array((3, 5))
 
-    # srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
-    # srg_region = srg.compute(region, image, threshold)
-    #
-    #
-    # for i in range(len(srg_region)):
-    #          print i,srg_region[i].label.shape[0]
-
+    starttime = time.clock()
 
     similarity_criteria.set_rand_neighbor_prop(0.7)
     seed_sampling_num = 10
@@ -42,9 +36,7 @@ if __name__ == "__main__":
             print i, j, rsrg_region[i][j].label.shape[0]
 
     endtime = time.clock()
-
     print(endtime - starttime)
-
 
 
 

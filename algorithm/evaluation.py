@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def dice(volume1, volume2):
     """
     Computes the Dice coefficient, a measure of set similarity.
