@@ -402,39 +402,42 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         # compute distance for 2d image
         if image.ndim == 2:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
+            region_std = np.std(image[region.label[:lsize, 0], region.label[:lsize, 1]])
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
-            neighbor_std = np.std(neighbor_val)
 
             prior_region_val = np.mean(
                 prior_image[region.label[:lsize, 0], region.label[:lsize, 1]])
+            prior_region_std = np.std(
+                prior_image[region.label[:lsize, 0], region.label[:lsize, 1]])
             prior_neighbor_val = prior_image[
                 region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
-            prior_neighbor_std = np.std(prior_neighbor_val)
+
 
             #  The distance include data distance and prior distance
             if self.wei_meth == 'PB':
                 dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
             else:
-                dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
-                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
+                dist = np.abs((region_val - neighbor_val) / region_std) + \
+                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
 
         # compute distance for 3d image
         elif image.ndim == 3:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
+            region_std = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
-            neighbor_std = np.std(neighbor_val)
 
             prior_region_val = np.mean(
                 prior_image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
+            prior_region_std = np.std(
+                prior_image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
             prior_neighbor_val = prior_image[
                 region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
-            prior_neighbor_std = np.std(prior_neighbor_val)
 
             if self.wei_meth == 'PB':
                 dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
             else:
-                dist = np.abs((region_val - neighbor_val) / neighbor_std) + \
-                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_neighbor_std)
+                dist = np.abs((region_val - neighbor_val) / region_std) + \
+                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
 
         # compute distance for 4d image
         else:
