@@ -242,6 +242,81 @@ class SimilarityCriteria(object):
         """
         return self.rand_neighbor_prop
 
+
+    def compute_distance(self, region, image, nbidx, metric=None):
+        """
+        Compute the distance between the labeled region and its neighbors.
+
+        Parameters
+        ----------
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented.
+        region: class Region
+            represent the current region and associated attributes
+        nbidx: numpy 1d array
+            A array to provide the index which neighbors should be considered
+        """
+
+        if metric is None:
+            metric = self.metric
+
+        if metric == 'euclidean':
+            # compute distance for 2d image
+            if image.ndim == 2:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+                dist = np.abs(region_val - neighbor_val)
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+                dist = np.abs(region_val - neighbor_val)
+
+            # compute distance for 4d image
+            else:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2], :])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+
+                dist = distance.cdist(region_val, neighbor_val, 'euclidean')
+
+        elif metric == 'mahalanobis':
+            if image.ndim == 2:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
+                region_std = np.std(image[region.label[:, 0], region.label[:, 1]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+                dist = np.abs(region_val - neighbor_val) / region_std
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                region_std = np.std(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+                dist = np.abs(region_val - neighbor_val) / region_std
+
+            # compute distance for 4d image
+            elif image.ndim == 4:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2], :])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+                dist = distance.cdist(region_val, neighbor_val, 'mahalanobis')
+
+        elif metric == 'exp':
+            if image.ndim == 2:
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+            dist = np.exp(-neighbor_val)
+
+        return dist
+
+
     def compute(self, region, image):
         """
         Compute the similarity between the labeled region and its neighbors.
@@ -257,34 +332,15 @@ class SimilarityCriteria(object):
 
         """
 
-        lsize = region.label_size()
         nsize = region.neighbor_size()
-
         if self.rand_neighbor_prop == 1:
             nbidx = np.arange(nsize)
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-
-        # compute distance for 2d image
-        if image.ndim == 2:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
-            dist = np.abs(region_val - neighbor_val)
-
-        # compute distance for 3d image
-        elif image.ndim == 3:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
-            dist = np.abs(region_val - neighbor_val)
-
-        # compute distance for 4d image
-        else:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
-            dist = distance.cdist(region_val, neighbor_val, self.metric)
-
+        dist = self.compute_distance(region, image, nbidx)
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
+
         return nearest_neighbor.reshape((-1, 3))
 
 
@@ -371,7 +427,6 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
         return self.wei_meth
 
-
     def compute(self, region, image):
         """
         Compute the similarity between the labeled region and its neighbors.
@@ -385,11 +440,9 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
         """
 
-        lsize = region.label_size()
         nsize = region.neighbor_size()
-
-        prior_weight = self.get_prior_weight();
-        prior_image = self.get_prior_image();
+        prior_weight = self.get_prior_weight()
+        prior_image = self.get_prior_image()
 
         if image.shape != self.prior_image.shape:
             raise ValueError("The image shape should match the prior image shape. ")
@@ -399,51 +452,15 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-        # compute distance for 2d image
-        if image.ndim == 2:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            region_std = np.std(image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+        image_dist = self.compute_distance(region, image, nbidx)
 
-            prior_region_val = np.mean(
-                prior_image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            prior_region_std = np.std(
-                prior_image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            prior_neighbor_val = prior_image[
-                region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
-
-
-            #  The distance include data distance and prior distance
-            if self.wei_meth == 'PB':
-                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
-            else:
-                dist = np.abs((region_val - neighbor_val) / region_std) + \
-                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
-
-        # compute distance for 3d image
-        elif image.ndim == 3:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            region_std = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
-
-            prior_region_val = np.mean(
-                prior_image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            prior_region_std = np.std(
-                prior_image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            prior_neighbor_val = prior_image[
-                region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
-
-            if self.wei_meth == 'PB':
-                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
-            else:
-                dist = np.abs((region_val - neighbor_val) / region_std) + \
-                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
-
-        # compute distance for 4d image
+        #  The distance include data distance and prior distance
+        if 'PB' == self.wei_meth:
+            prior_dist = self.compute_distance(region, prior_image, nbidx, 'exp')
+            dist = image_dist * prior_dist
         else:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
-            dist = distance.cdist(region_val, neighbor_val, self.metric)
+            prior_dist = self.compute_distance(region, prior_image, nbidx, 'mahalanobis')
+            dist = image_dist + prior_weight * prior_dist
 
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
         return nearest_neighbor.reshape((-1, 3))
