@@ -243,7 +243,7 @@ class SimilarityCriteria(object):
         return self.rand_neighbor_prop
 
 
-    def compute_distance(self, region, image, nbidx, metric=None):
+    def compute_neighbor_distance(self, region, image, nbidx, metric=None):
         """
         Compute the distance between the labeled region and its neighbors.
 
@@ -338,7 +338,7 @@ class SimilarityCriteria(object):
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-        dist = self.compute_distance(region, image, nbidx)
+        dist = self.compute_neighbor_distance(region, image, nbidx)
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
 
         return nearest_neighbor.reshape((-1, 3))
@@ -452,14 +452,14 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-        image_dist = self.compute_distance(region, image, nbidx)
+        image_dist = self.compute_neighbor_distance(region, image, nbidx)
 
         #  The distance include data distance and prior distance
         if 'PB' == self.wei_meth:
-            prior_dist = self.compute_distance(region, prior_image, nbidx, 'exp')
+            prior_dist = self.compute_neighbor_distance(region, prior_image, nbidx, 'exp')
             dist = image_dist * prior_dist
         else:
-            prior_dist = self.compute_distance(region, prior_image, nbidx, 'mahalanobis')
+            prior_dist = self.compute_neighbor_distance(region, prior_image, nbidx, 'mahalanobis')
             dist = image_dist + prior_weight * prior_dist
 
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
