@@ -21,7 +21,7 @@ if __name__ == "__main__":
     region = Region(seed_coords, neighbor_element)
 
     # similarity
-    similarity_criteria = PriorBasedSimilarityCriteria(prior_image)
+    similarity_criteria = PriorBasedSimilarityCriteria(prior_image, 'DB', 0.5)
     stop_criteria = StopCriteria('size')
 
     # region size

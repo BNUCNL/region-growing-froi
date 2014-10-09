@@ -201,7 +201,7 @@ class SimilarityCriteria(object):
 
     """
 
-    def __init__(self, metric='educlidean', rand_neighbor_prop=1):
+    def __init__(self, metric='euclidean', rand_neighbor_prop=1):
         """
         Parameters
         -----------------------------------------------------
@@ -307,6 +307,7 @@ class SimilarityCriteria(object):
         elif metric == 'exp':
             if image.ndim == 2:
                 neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+                print neighbor_val
 
             # compute distance for 3d image
             elif image.ndim == 3:
@@ -361,7 +362,7 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
     """
 
-    def __init__(self, prior_image, wei_meth='PB', prior_weight=None, metric='educlidean', rand_neighbor_prop=1):
+    def __init__(self, prior_image, wei_meth='PB', prior_weight=None, metric='euclidean', rand_neighbor_prop=1):
         """
         Parameters
         -----------------------------------------------------
