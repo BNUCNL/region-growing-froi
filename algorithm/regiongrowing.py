@@ -191,13 +191,16 @@ class SimilarityCriteria(object):
     Attributes
     ----------
     metric: str,optional
-    A description for the metric type
+        A description for the metric type
+
+    rand_neighbor_prop: double, optional
+        The percent of neighbors to be used in growing.
+        All neighbors are used in default.
 
     Methods
     ------
-    compute(region, image, prior_image=None)
+    compute(region, image)
         Do computing the similarity between the labeled region and its neighbors
-
 
     """
 
@@ -255,6 +258,8 @@ class SimilarityCriteria(object):
             represent the current region and associated attributes
         nbidx: numpy 1d array
             A array to provide the index which neighbors should be considered
+        metric: str, optional
+            distance metric
         """
 
         if metric is None:
@@ -366,10 +371,16 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         """
         Parameters
         -----------------------------------------------------
-        metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
-        rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
-
-        wei_meth: weighted method for the prior,supporting probability based(PB) and distance based(DB) method
+        prior_image: np array
+            the prior image used in the similarity computing
+        wei_meth: str, optional
+            the weighted method for the prior,supporting probability based(PB) and distance based(DB) method
+        prior_weight: double,
+            the weight to use the prior
+        metric: str,optional
+            the distance metric such as 'euclidean', 'mahalanobis','exp'. Default is 'euclidean'.
+        rand_neighbor_prop: double, optional
+            the proportion of neighbors in calculating the similarity
         """
 
         super(PriorBasedSimilarityCriteria, self).__init__(metric, rand_neighbor_prop)
