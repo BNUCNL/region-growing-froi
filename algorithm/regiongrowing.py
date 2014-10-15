@@ -206,6 +206,7 @@ class SimilarityCriteria(object):
         Parameters
         -----------------------------------------------------
         metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        optimal_nei: optimal neighbor include most similar first(SF) or maximum first(MF)
         rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
         """
         if not isinstance(metric, str):
@@ -265,7 +266,6 @@ class SimilarityCriteria(object):
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-
         # compute distance for 2d image
         if image.ndim == 2:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
@@ -284,8 +284,8 @@ class SimilarityCriteria(object):
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
             dist = distance.cdist(region_val, neighbor_val, self.metric)
 
-        nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
-        return nearest_neighbor.reshape((-1, 3))
+        optimal_neighbor = region.neighbor[nbidx[dist.argmin()], :]
+        return optimal_neighbor.reshape((-1, 3))
 
 
 class PriorBasedSimilarityCriteria(SimilarityCriteria):
@@ -305,13 +305,13 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
     """
 
-    def __init__(self, prior_image, wei_meth='PB', prior_weight=None, metric='educlidean', rand_neighbor_prop=1):
+    def __init__(self, prior_image, wei_meth='PB', prior_weight=None, optimal_nei='SF', metric='educlidean', rand_neighbor_prop=1):
         """
         Parameters
         -----------------------------------------------------
         metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
         rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
-
+        optimal_nei: optimal neighbor include most similar first(SF) or maximum first(MF)
         wei_meth: weighted method for the prior,supporting probability based(PB) and distance based(DB) method
         """
 
@@ -321,6 +321,11 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
             self.wei_meth = wei_meth
         else:
             raise ValueError("The weighted method should be 'PB(probability based)' or 'DB(distance based)'.")
+
+        if optimal_nei == 'SF' or optimal_nei == 'MF':
+            self.optimal_nei = optimal_nei
+        else:
+            raise ValueError("The optimal neighbor method should be 'SF(similar first)' or 'MF(maximum first)'.")
 
         self.prior_image = prior_image
         self.prior_weight = prior_weight
@@ -371,6 +376,17 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
         return self.wei_meth
 
+    def set_optimal_nei(self, optimal_nei):
+        """
+        Set the optimal neighbor method
+        """
+        self.optimal_nei = optimal_nei
+
+    def get_optimal_nei(self):
+        """
+        Get the optimal neighbor method
+        """
+        return self.optimal_nei
 
     def compute(self, region, image):
         """
@@ -412,18 +428,10 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
             prior_neighbor_val = prior_image[
                 region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
 
-
-            #  The distance include data distance and prior distance
-            if self.wei_meth == 'PB':
-                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
-            else:
-                dist = np.abs((region_val - neighbor_val) / region_std) + \
-                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
-
         # compute distance for 3d image
         elif image.ndim == 3:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            region_std = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
+            region_std = np.std(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
 
             prior_region_val = np.mean(
@@ -433,20 +441,27 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
             prior_neighbor_val = prior_image[
                 region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
 
-            if self.wei_meth == 'PB':
-                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
-            else:
-                dist = np.abs((region_val - neighbor_val) / region_std) + \
-                       prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
-
         # compute distance for 4d image
         else:
             region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
             neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
             dist = distance.cdist(region_val, neighbor_val, self.metric)
 
-        nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
-        return nearest_neighbor.reshape((-1, 3))
+            #  The distance include data distance and prior distance
+        if self.wei_meth == 'PB':
+            if self.optimal_nei == 'SF':
+                dist = np.abs(region_val - neighbor_val) * np.exp(-prior_neighbor_val)
+            else:
+                dist = (region_val - neighbor_val) * np.exp(-prior_neighbor_val)
+        else:
+            if self.optimal_nei == 'SF':
+                dist = np.abs((region_val - neighbor_val) / region_std) + \
+                        prior_weight * np.abs((prior_region_val - prior_neighbor_val) / prior_region_std)
+            else:
+                dist = (region_val - neighbor_val) / region_std + \
+                        prior_weight * (prior_region_val - prior_neighbor_val) / prior_region_std
+        optimal_neighbor = region.neighbor[nbidx[dist.argmin()], :]
+        return optimal_neighbor.reshape((-1, 3))
 
 
 class StopCriteria(object):
@@ -787,14 +802,14 @@ class Aggregator(object):
 
         elif image.ndim == 3:
             agg_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
-            region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
-            weight = np.ones(len(region))
+            region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region[0])), dtype=int)
+            weight = np.ones(len(region[0]))
+            print len(region),  len(region[0])
             if self.agg_type == 'UWA':
                 for i in range(len(region)):
-                    for j in range(region[0]):
+                    for j in range(len(region[0])):
                         label = region[i][j].get_label()
                         region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
-
                     weight = weight / weight.sum()
                     agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
                     region_image[:] = 0
