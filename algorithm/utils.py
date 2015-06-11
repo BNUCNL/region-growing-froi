@@ -27,7 +27,7 @@ def in2d(A, B):
     """
     Find whether the row of A is in B
 
-    Parameters
+    Parametersasrgtest.py
     ----------
     A,B: numpy 2d array
 

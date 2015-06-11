@@ -1,4 +1,5 @@
 import copy
+
 from scipy.spatial import distance
 from algorithm.neighbor import *
 
@@ -59,43 +60,6 @@ class Region(object):
         """
         return self.seed
 
-    def seed_sampling(self, sampling_num):
-        """
-        Randomly sample coordinates from the seeds.
-        In each sampling, only one coordinate from each group of seeds will be sampled
-
-        """
-        if sampling_num > 0:
-            self.sampling_seed = self.seed[np.random.choice(self.seed.shape[0], sampling_num, replace=True), :]
-        else:
-            self.sampling_seed = self.seed
-
-        return self.sampling_seed
-
-    def seed_sampling_weights(self, sampling_num, mask):
-        """
-        Randomly sample coordinates from the seeds.
-        In each sampling, only one coordinate from each group of seeds will be sampled
-
-        """
-        if sampling_num > 0:
-            mask_values = mask[self.seed[:, 0], self.seed[:, 1], self.seed[:, 2]].astype(np.float)
-            if mask_values.min() < 0:
-                mask_values += np.abs(mask_values.min())
-            weights = mask_values / mask_values.sum()
-            self.sampling_seed = self.seed[np.random.choice(self.seed.shape[0], sampling_num, p=weights, replace=True), :]
-        else:
-            self.sampling_seed = self.seed
-
-        return self.sampling_seed
-
-    def get_sampling_seed(self):
-        """
-        Return the smapling seed.
-
-        """
-        return self.sampling_seed
-
     def label_size(self):
         """
         Return the size of current label.
@@ -123,7 +87,7 @@ class Region(object):
         return self.neighbor_element
 
 
-    def add_label(self, label):
+    def add_label(self, label, slic_image):
         """
         Add the coordinates of new label to the label of region.
 
@@ -132,23 +96,18 @@ class Region(object):
         neighbor: numpy 2d array
             Each row represents the coordinates for a pixels
         """
-        self.label = np.append(self.label, label, axis=0)
+        if len(label.shape == 2):
+            slic_label = np.nonzero(slic_image == slic_image[label[:, 0], label[:, 1]])
+        elif len(label.shape == 3):
+            slic_label = np.nonzero(slic_image == slic_image[label[:, 0], label[:, 1], label[:, 2]])
+        print 'slic_label.shape: ', slic_label.shape
+
+        self.label = np.append(self.label, slic_label, axis=0)
 
         #self.label = np.array(self.label.tolist() + label.tolist())
         #self.label = np.array(np.append(self.label, label, axis=0).tolist())
 
         # print 'label', self.label.shape[0]
-
-    def set_label(self, label):
-        """
-        Set the coordinates of new label to the label of region.
-
-        Parameters
-        ----------
-        neighbor: numpy 2d array
-            Each row represents the coordinates for a pixels
-        """
-        self.label = label
 
 
     def get_label(self):
@@ -217,24 +176,27 @@ class Region(object):
         return self.label[boundary, :]
 
 
-class SimilarityCriteria:
+class SimilarityCriteria(object):
     """
     The object to compute the similarity between the labeled region and its neighbors
 
     Attributes
     ----------
     metric: str,optional
-    A description for the metric type
+        A description for the metric type
+
+    rand_neighbor_prop: double, optional
+        The percent of neighbors to be used in growing.
+        All neighbors are used in default.
 
     Methods
     ------
-    compute(region, image, prior_image=None)
+    compute(region, image)
         Do computing the similarity between the labeled region and its neighbors
-
 
     """
 
-    def __init__(self, metric='educlidean', rand_neighbor_prop=1):
+    def __init__(self, metric='euclidean'):
         """
         Parameters
         -----------------------------------------------------
@@ -243,13 +205,7 @@ class SimilarityCriteria:
         """
         if not isinstance(metric, str):
             raise ValueError("The metric must be a str. ")
-
         self.metric = metric
-
-        if 0 < rand_neighbor_prop <= 1:
-            self.rand_neighbor_prop = rand_neighbor_prop
-        else:
-            raise ValueError("The rand_neighbor_prop must be between 0 and 1. ")
 
     def set_metric(self, metric):
         """
@@ -263,17 +219,81 @@ class SimilarityCriteria:
         """
         return self.metric
 
-    def set_rand_neighbor_prop(self, rand_neighbor_prop):
+    def compute_neighbor_distance(self, region, image, nbidx, metric=None):
         """
-        Set the neighbor prop for randomization
-        """
-        self.rand_neighbor_prop = rand_neighbor_prop
+        Compute the distance between the labeled region and its neighbors.
 
-    def get_rand_neighbor_prop(self):
+        Parameters
+        ----------
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented.
+        region: class Region
+            represent the current region and associated attributes
+        nbidx: numpy 1d array
+            A array to provide the index which neighbors should be considered
+        metric: str, optional
+            distance metric
         """
-        Get the neighbor prop for randomization
-        """
-        return self.rand_neighbor_prop
+
+        if metric is None:
+            metric = self.metric
+
+        if metric == 'euclidean':
+            # compute distance for 2d image
+            if image.ndim == 2:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+                dist = np.abs(region_val - neighbor_val)
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+                dist = np.abs(region_val - neighbor_val)
+
+            # compute distance for 4d image
+            else:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2], :])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+
+                dist = distance.cdist(region_val, neighbor_val, 'euclidean')
+
+        elif metric == 'mahalanobis':
+            if image.ndim == 2:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
+                region_std = np.std(image[region.label[:, 0], region.label[:, 1]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+                dist = np.abs(region_val - neighbor_val) / region_std
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                region_std = np.std(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+                dist = np.abs(region_val - neighbor_val) / region_std
+
+            # compute distance for 4d image
+            elif image.ndim == 4:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2], :])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+                dist = distance.cdist(region_val, neighbor_val, 'mahalanobis')
+
+        elif metric == 'exp':
+            if image.ndim == 2:
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+                print neighbor_val
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+            dist = np.exp(-neighbor_val)
+
+        return dist
 
     def compute(self, region, image):
         """
@@ -290,34 +310,15 @@ class SimilarityCriteria:
 
         """
 
-        lsize = region.label_size()
         nsize = region.neighbor_size()
-
         if self.rand_neighbor_prop == 1:
             nbidx = np.arange(nsize)
         else:
             nbidx = np.random.choice(nsize, np.rint(nsize * self.rand_neighbor_prop), replace=False)
 
-
-        # compute distance for 2d image
-        if image.ndim == 2:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1]])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
-            dist = np.abs(region_val - neighbor_val)
-
-        # compute distance for 3d image
-        elif image.ndim == 3:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2]])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
-            dist = np.abs(region_val - neighbor_val)
-
-        # compute distance for 4d image
-        else:
-            region_val = np.mean(image[region.label[:lsize, 0], region.label[:lsize, 1], region.label[:lsize, 2], :])
-            neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
-            dist = distance.cdist(region_val, neighbor_val, self.metric)
-
+        dist = self.compute_neighbor_distance(region, image, nbidx)
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
+
         return nearest_neighbor.reshape((-1, 3))
 
 
@@ -387,6 +388,7 @@ class StopCriteria(object):
                 self.stop = True
 
     def isstop(self):
+
         return self.stop
 
     def set_stop(self):
@@ -396,7 +398,7 @@ class StopCriteria(object):
         self.stop = False
 
 
-class SeededRegionGrowing(object):
+class SLICSeededRegionGrowing(object):
     """
     Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeded region.
 
@@ -458,7 +460,7 @@ class SeededRegionGrowing(object):
 
     def compute(self, region, image, threshold):
         """
-         Region grows based on the attributes seeds,similarity and stop criterion
+        Compute regions
 
         Parameters
         ----------
@@ -467,16 +469,34 @@ class SeededRegionGrowing(object):
         image: numpy 2d/3d/4d array
             The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
             and the 4th dimension is time or feature dimension
-        threshold: numpy 1d array, float
-            Stop thresholds for region growing
-
+        threshold: a numpy nd array
+            Stop threshold for growing
 
         Returns
         -------
-            region: a list of region object
-                The regions are generated for each threshold, one region for one threshold
+        regions:  a 2D list of Region object
+            The regions are generated for each seed and each threshold. As a result, regions are a 2D list.
+            The first dim is for seeds, and the second dim is for threshold
 
         """
+        from skimage.segmentation import slic
+
+        dim = len(image.shape)
+        if dim == 4 and image.shape[3] != 3:
+            raise ValueError("The forth dimension must be 3.")
+        elif dim == 4 and image.shape[3] == 3:
+            multichannel = True
+        else:
+            multichannel = False
+
+        gray_image = (image - image.min()) * 255.0 / (image.max() - image.min())
+        slic_image = slic(gray_image.astype(np.float),
+                          n_segments=self.n_segments,
+                          compactness=10,
+                          sigma=2,
+                          slic_zero=True,
+                          multichannel =multichannel,
+                          enforce_connectivity=True)
 
         regions = []
         region = copy.copy(region)
@@ -499,80 +519,6 @@ class SeededRegionGrowing(object):
 
             regions.append(copy.copy(region))
             self.stop_criteria.set_stop()
-
-        return regions
-
-
-class RandomSRG(SeededRegionGrowing):
-    """
-    Seeded region growing based on random seeds.
-
-    Attributes
-    ----------
-    similarity_criteria: SimilarityCriteria object
-        The similarity criteria which control the neighbor to merge to the region
-    stop_criteria: StopCriteria object
-        The stop criteria which control when the region growing stop
-    seed_sampling_num: int, optional
-        The sampling number for seed with replacement
-
-    Methods
-    -------
-    computing(image,region,threshold)
-        Do region growing
-
-    """
-
-    def __init__(self, similarity_criteria, stop_criteria, seed_sampling_num, mask_image=None):
-        """
-        Initialize the object
-
-        Parameters
-        ----------
-        similarity_criteria: class SimilarityCriteria
-            The similarity criteria which control the neighbor to merge to the region
-        stop_criteria: class StopCriteria
-            The stop criteria which control when the region growing stop
-
-        """
-
-        self.similarity_criteria = similarity_criteria
-        self.stop_criteria = stop_criteria
-        self.seed_sampling_num = seed_sampling_num
-        self.mask_image = mask_image
-
-
-    def compute(self, region, image, threshold):
-        """
-        Aggregation for different regions
-
-        Parameters
-        ----------
-        region: Region object
-            seeded region for growing
-        image: numpy 2d/3d/4d array
-            The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
-            and the 4th dimension is time or feature dimension
-        threshold: a numpy nd array
-            Stop threshold for growing
-
-        Returns
-        -------
-        regions:  a 2D list of Region object
-            The regions are generated for each seed and each threshold. As a result, regions are a 2D list.
-            The first dim is for seeds, and the second dim is for threshold
-
-        """
-        regions = []
-        coords = region.seed_sampling_weights(self.seed_sampling_num, self.mask_image)
-        i = 0
-        for seed in coords:
-            region.set_seed(seed.reshape((-1, 3)))
-            reg = super(RandomSRG, self).compute(region, image, threshold)
-            regions.append(copy.copy(reg))
-            self.stop_criteria.set_stop()
-            print 'i: ',i
-            i+= 1
 
         return regions
 
@@ -622,8 +568,8 @@ class Aggregator(object):
         """
 
         if image.ndim == 2:
-            agg_image = np.zeros((image.shape[0], image.shape[1], len(region[0])), dtype=float)
-            region_image = np.zeros((image.shape[0], image.shape[1], len(region)), dtype=int)
+            agg_image = np.zeros((image.shape[0], image.shape[1], len(region)), dtype=int)
+            region_image = np.zeros((image.shape[0], image.shape[1], len(region[0])), dtype=int)
             weight = np.ones(len(region[0]))
 
             if self.agg_type == 'UWA':
@@ -639,7 +585,7 @@ class Aggregator(object):
             elif self.agg_type == 'MWA':
                 for i in range(len(region)):
                     for j in range(len(region[0])):
-                        label = region[j][i].get_label()
+                        label = region[i][j].get_label()
                         region_image[label[:, 0], label[:, 1], j] = 1
                         weight[j] = np.mean(image[label[:, 0], label[:, 1]])
 
@@ -650,7 +596,7 @@ class Aggregator(object):
             elif self.agg_type == 'HWA':
                 for i in range(len(region)):
                     for j in range(len(region[0])):
-                        label = region[j][i].get_label()
+                        label = region[i][j].get_label()
                         region_image[label[:, 0], label[:, 1], j] = 1
                         weight[j] = np.std(image[label[:, 0], label[:, 1]])
 
@@ -659,14 +605,13 @@ class Aggregator(object):
                     region_image[:] = 0
 
         elif image.ndim == 3:
-            agg_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region[0])), dtype=float)
-            region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=np.int32)
-            weight = np.ones(len(region), dtype=float)
-
+            agg_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
+            region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=int)
+            weight = np.ones(len(region))
             if self.agg_type == 'UWA':
-                for i in range(len(region[0])):
-                    for j in range(region):
-                        label = region[j][i].get_label()
+                for i in range(len(region)):
+                    for j in range(region[0]):
+                        label = region[i][j].get_label()
                         region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
 
                     weight = weight / weight.sum()
@@ -674,34 +619,23 @@ class Aggregator(object):
                     region_image[:] = 0
 
             elif self.agg_type == 'MWA':
-                for i in range(len(region[0])):
-                    for j in range(len(region)):
-                        label = region[j][i].get_label()
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
                         region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
                         weight[j] = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
 
-                    # print weight.max() - weight.min()
-                    # min = weight.min()
-                    # if min < 0:
-                    #     weight += np.abs(min)
-                    # weight = weight / weight.sum()
-
-                    # weight = np.arctan(weight) * 2 / 3.1415926
-                    if weight.min() < 0:
-                        weight += np.abs(weight.min())
                     weight = weight / weight.sum()
-                    agg_image[..., i] = np.average(region_image, axis=3, weights=weight)
-                    # region_image[:] = 0
+                    agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
+                    region_image[:] = 0
 
             elif self.agg_type == 'HWA':
-                for i in range(len(region[0])):
-                    for j in range(len(region)):
-                        label = region[j][i].get_label()
+                for i in range(len(region)):
+                    for j in range(len(region[0])):
+                        label = region[i][j].get_label()
                         region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
                         weight[j] = np.std(image[label[:, 0], label[:, 1], label[:, 2]])
 
-                    if weight.min() < 0:
-                        weight = weight + np.abs(weight.min())
                     weight = weight / weight.sum()
                     agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
                     region_image[:] = 0
@@ -709,7 +643,7 @@ class Aggregator(object):
         elif image.ndim == 4:
             pass
 
-        return agg_image, weight, region_image
+        return agg_image
 
 
 class Optimizer(object):
@@ -735,11 +669,10 @@ class Optimizer(object):
             default is PC.
         """
 
-        # if opt_type == 'PC' or opt_type == 'AC':
-        #     self.opt_type = opt_type
-        # else:
-        #     raise ValueError("The Type of aggregator should be 'PC' and 'AC'.")
-        self.opt_type = opt_type
+        if opt_type == 'PC' or opt_type == 'AC':
+            self.opt_type = opt_type
+        else:
+            raise ValueError("The Type of aggregator should be 'PC' and 'AC'.")
 
     def compute(self, region, image):
         """
@@ -798,11 +731,14 @@ class Optimizer(object):
                         neighbor = region[i][j].get_neighbor()
                         region_val = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
                         per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1], neighbor[:, 2]])
-                        con_val[i, j] = (region_val - per_val)
+                        if (region_val + per_val) == 0:
+                            con_val[i, j] = 0
+                        else:
+                            con_val[i, j] = (region_val - per_val) / (region_val + per_val)
 
         elif image.ndim == 4:
             pass
-        con_val =  con_val /con_val.max()
+
         return con_val
 
 
