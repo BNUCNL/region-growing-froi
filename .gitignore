@@ -1,8 +1,8 @@
-/.idea/
+
 .idea
 *.pyc
-/tests/configs.py
-/tests/asrgtest.py
-/tests/rsrgtest.py
-/tests/slicSRGtest.py
+tests/configs.py
+tests/asrgtest.py
+tests/rsrgtest.py
+tests/slicSRGtest.py
 
