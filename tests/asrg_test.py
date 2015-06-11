@@ -2,26 +2,11 @@ import time
 
 import numpy as np
 import nibabel as nib
-from docx import Document
-from docx.shared import Inches
 
-from algorithm.regiongrowing import *
-from case.matplot_case.histogram_features import show_date_index_formatter
+from algorithm.region_growing import *
+from algorithm.similarity_criteria import *
+from algorithm.stop_criteria import *
 
-SUBJECT_ID_DIR = "G:/nfs/4Ddata/2006subID"
-ACTIVATION_DATA_DIR = "G:/nfs/t2/atlas/group/face-object/activation/2006zstat.nii.gz"
-RESULT_NPY_FILE = "peak_points_all_sub.npy"
-ROI = ['r_OFA', 'l_OFA', 'r_pFus', 'l_pFus']
-
-RESULT_DATA_DIR = "G:/workingdir/result/"
-ASRG_RESULT_DOC_DATA_DIR = "G:/workingdir/result/asrg/doc/"
-PC_RESULT_DOCX_FILE = "PC_peak_point_results.docx"
-AC_RESULT_DOCX_FILE = "AC_peak_point_results.docx"
-PC_RESULT_NPY_FILE = "PC_peak_point_results.npy"
-AC_RESULT_NPY_FILE = "AC_peak_point_results.npy"
-AC_OPTIMAL_FILE = "AC_optimal_file.nii.gz"
-PC_OPTIMAL_FILE = "PC_optimal_file.nii.gz"
-TEMP_IMG_DIR = 'G:/workingdir/BAA/seven/result/temp.png'
 
 if __name__ == "__main__":
     starttime = time.clock()
@@ -36,7 +21,6 @@ if __name__ == "__main__":
     # neighbor_element = SpatialNeighbor('connected', mask.shape, 26)
     # region = Region(seed_coords, neighbor_element)
 
-    roi_peak_points = np.load(RESULT_DATA_DIR + RESULT_NPY_FILE)
 
     # similarity_criteria = SimilarityCriteria('euclidean', 0.8)
     similarity_criteria = SimilarityCriteria('euclidean')

@@ -4,12 +4,12 @@ import time
 
 import nibabel as nib
 
-from algorithm.regiongrowing import *
+from algorithm.region_growing import *
 from algorithm.neighbor import *
 
 if __name__ == "__main__":
     # image to be segmanted
-    image = nib.load("../data/S2/tstat1.nii.gz")
+    image = nib.load("../data/S1/tstat1.nii.gz")
     affine = image.get_affine()
     image = image.get_data()
 

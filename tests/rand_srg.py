@@ -4,7 +4,7 @@ import time
 
 import nibabel as nib
 
-from algorithm.regiongrowing import *
+from algorithm.region_growing import *
 from algorithm.neighbor import *
 
 if __name__ == "__main__":

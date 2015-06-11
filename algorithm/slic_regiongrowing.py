@@ -1,12 +1,14 @@
 __author__ = 'zgf'
 
-import nibabel as nib
-import numpy as np
 import multiprocessing
 
+import nibabel as nib
+import numpy as np
 from skimage.segmentation import slic
 from scipy.ndimage.morphology import binary_dilation
+
 from configs import *
+
 
 SUPERVOXEL_SEGMENTATION = 100000
 SUBJECT_NUM = 70
@@ -20,6 +22,7 @@ right_barin_mask = nib.load(PROB_ROI_202_SUB_FILE + PROB_RIGHT_BRAIN_FILE).get_d
 
 roi_peak_points = np.load(PEAK_POINTS_DIR + RESULT_NPY_FILE)
 
+
 def compute_supervoxel(volume):
     gray_image = (volume - volume.min()) * 255 / (volume.max() - volume.min())
 
@@ -27,7 +30,7 @@ def compute_supervoxel(volume):
                       n_segments=SUPERVOXEL_SEGMENTATION,
                       slic_zero=True,
                       sigma=2,
-                      multichannel =False,
+                      multichannel=False,
                       enforce_connectivity=True)
     # nib.save(nib.Nifti1Image(slic_image, affine), RW_AGGRAGATOR_RESULT_DATA_DIR + 'supervoxel.nii.gz')
 
@@ -41,6 +44,7 @@ def compute_supervoxel(volume):
 
     return slic_image
 
+
 def compute_slic_max_region_mean(volume, region_volume, slic_image):
     neighbor_slic = binary_dilation(region_volume)
     neighbor_slic[region_volume > 0] = 0
@@ -50,13 +54,14 @@ def compute_slic_max_region_mean(volume, region_volume, slic_image):
 
     region_means = np.zeros((len(neighbor_values - 1), ))
     for i in range(len(neighbor_values)):
-        if neighbor_values[i] !=0 :
+        if neighbor_values[i] != 0:
             neighbor_slic[slic_image == neighbor_values[i]] = 1
             region_means[i] = volume[slic_image == neighbor_values[i]].mean()
-        # print 'region_means: ',region_means
-    # print 'neighbor_values[region_means.argmax(): ', neighbor_values[region_means.argmax()]
+            # print 'region_means: ',region_means
+        # print 'neighbor_values[region_means.argmax(): ', neighbor_values[region_means.argmax()]
 
     return neighbor_slic, slic_image == neighbor_values[region_means.argmax()]
+
 
 def supervoxel_based_regiongrowing(slic_image, volume, seed, size=10):
     seed = np.array(seed)
@@ -67,7 +72,7 @@ def supervoxel_based_regiongrowing(slic_image, volume, seed, size=10):
     seed_regions[..., 0] = seed_region
     neighbor_slics = np.zeros((seed_region.shape[0], seed_region.shape[1], seed_region.shape[2], size))
 
-    for i in range(0, size-1):
+    for i in range(0, size - 1):
         neighbor_slic, best_parcel = compute_slic_max_region_mean(volume, seed_region, slic_image)
         seed_region[best_parcel] = 1
         seed_regions[..., i + 1] = seed_region
@@ -82,6 +87,7 @@ def supervoxel_based_regiongrowing(slic_image, volume, seed, size=10):
 
     return neighbor_slics, seed_regions
 
+
 def compute_optional_region_based_AC_value(volume, regions, neighbor_slics):
     AC_values = np.zeros((regions.shape[3], ))
     for i in range(regions.shape[3]):
@@ -90,20 +96,25 @@ def compute_optional_region_based_AC_value(volume, regions, neighbor_slics):
     # print 'AC_values: ', AC_values
     return regions[..., AC_values.argmax()]
 
+
 def single_process(subject_index):
     result_volume = np.zeros((all_volumes.shape[0], all_volumes.shape[1], all_volumes.shape[2]))
     slic_image = compute_supervoxel(all_volumes[..., subject_index])
 
     for i in range(len(ROI)):
         seed = np.array([roi_peak_points[subject_index, i, :]]).astype(np.int)[0]
-        neighbor_slics, regions = supervoxel_based_regiongrowing(slic_image, all_volumes[..., subject_index], seed, size=10)
-        optimal_region = compute_optional_region_based_AC_value(all_volumes[..., subject_index], regions, neighbor_slics)
+        neighbor_slics, regions = supervoxel_based_regiongrowing(slic_image, all_volumes[..., subject_index], seed,
+                                                                 size=10)
+        optimal_region = compute_optional_region_based_AC_value(all_volumes[..., subject_index], regions,
+                                                                neighbor_slics)
         result_volume[optimal_region > 0] = i + 1
     print 'subject_index: ', subject_index
     return result_volume, slic_image
 
+
 if __name__ == "__main__":
     import datetime
+
     starttime = datetime.datetime.now()
 
     result_volumes = np.zeros((all_volumes.shape[0], all_volumes.shape[1], all_volumes.shape[2], SUBJECT_NUM))
