@@ -7,20 +7,19 @@ import numpy as np
 from skimage.segmentation import slic
 from scipy.ndimage.morphology import binary_dilation
 
-from configs import *
-
-
-SUPERVOXEL_SEGMENTATION = 100000
-SUBJECT_NUM = 70
-
-images = nib.load(ACTIVATION_DATA_DIR)
-affine = images.get_affine()
-all_volumes = images.get_data()
-
-left_barin_mask = nib.load(PROB_ROI_202_SUB_FILE + PROB_LEFT_BRAIN_FILE).get_data() > 0
-right_barin_mask = nib.load(PROB_ROI_202_SUB_FILE + PROB_RIGHT_BRAIN_FILE).get_data() > 0
-
-roi_peak_points = np.load(PEAK_POINTS_DIR + RESULT_NPY_FILE)
+# from configs import *
+#
+# SUPERVOXEL_SEGMENTATION = 100000
+# SUBJECT_NUM = 70
+#
+# images = nib.load(ACTIVATION_DATA_DIR)
+# affine = images.get_affine()
+# all_volumes = images.get_data()
+#
+# left_barin_mask = nib.load(PROB_ROI_202_SUB_FILE + PROB_LEFT_BRAIN_FILE).get_data() > 0
+# right_barin_mask = nib.load(PROB_ROI_202_SUB_FILE + PROB_RIGHT_BRAIN_FILE).get_data() > 0
+#
+# roi_peak_points = np.load(PEAK_POINTS_DIR + RESULT_NPY_FILE)
 
 
 def compute_supervoxel(volume):
@@ -96,20 +95,6 @@ def compute_optional_region_based_AC_value(volume, regions, neighbor_slics):
     # print 'AC_values: ', AC_values
     return regions[..., AC_values.argmax()]
 
-
-def single_process(subject_index):
-    result_volume = np.zeros((all_volumes.shape[0], all_volumes.shape[1], all_volumes.shape[2]))
-    slic_image = compute_supervoxel(all_volumes[..., subject_index])
-
-    for i in range(len(ROI)):
-        seed = np.array([roi_peak_points[subject_index, i, :]]).astype(np.int)[0]
-        neighbor_slics, regions = supervoxel_based_regiongrowing(slic_image, all_volumes[..., subject_index], seed,
-                                                                 size=10)
-        optimal_region = compute_optional_region_based_AC_value(all_volumes[..., subject_index], regions,
-                                                                neighbor_slics)
-        result_volume[optimal_region > 0] = i + 1
-    print 'subject_index: ', subject_index
-    return result_volume, slic_image
 
 
 if __name__ == "__main__":

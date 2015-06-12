@@ -1,5 +1,5 @@
-import time
 
+import time
 import nibabel as nib
 
 from algorithm.region_growing import *
@@ -35,33 +35,3 @@ if __name__ == "__main__":
 
     endtime = time.clock()
     print 'Cost time:: ', np.round((endtime - starttime), 3), ' s'
-
-regions = []
-srg_region = srg.compute(region, image[..., j], threshold)
-regions.append(srg_region)
-
-#AC
-optimizer_AC = Optimizer('AC')
-optimizer_AC_image = optimizer_AC.compute(regions, image[..., j])
-AC_roi_regions_result[j, :] = optimizer_AC_image[:]
-title_AC = str(j + 1) + '. ' + lines[j ] + ' --  ' + ROI[i] + ' AC Analysis'
-show_date_index_formatter(threshold, optimizer_AC_image[0, :], 'Threshold', 'AC Value', title_AC, 'g', True)
-
-region_size_AC = threshold[optimizer_AC_image.reshape(len(threshold),).argmax()]
-
-
-
-#PC
-optimizer_PC = Optimizer('PC')
-optimier_PC_image = optimizer_PC.compute(regions, image[..., j])
-PC_roi_regions_result[j, :] = optimier_PC_image[:]
-
-region_size_PC = threshold[optimier_PC_image.reshape(len(threshold),).argmax()]
-
-
-#Save data to nii.gz
-AC_labels = srg_region[optimizer_AC_image.reshape(len(threshold),).argmax()].get_label()
-AC_region_image[AC_labels[:, 0], AC_labels[:, 1], AC_labels[:, 2], j] = 1
-PC_labels = srg_region[optimier_PC_image.reshape(len(threshold),).argmax()].get_label()
-PC_region_image[PC_labels[:, 0], PC_labels[:, 1], PC_labels[:, 2], j] = 1
-

@@ -1,5 +1,5 @@
-import time
 
+import time
 import nibabel as nib
 
 from algorithm.region_growing import *
@@ -20,8 +20,8 @@ if __name__ == "__main__":
 
     mask = nib.load("../data/prior/prob_rFFA.nii.gz")
     mask = mask.get_data()
-
-    seed_coords = np.array(np.nonzero(mask >= 0.5)).T
+     #
+    seed_coords = np.array(np.nonzero(mask >= 0.5)).T.astype(np.int8) # astype(np.int8) must be added, or it may lead to some strange result.
     print 'seed_coords.shape => ', seed_coords.shape
     neighbor_element = SpatialNeighbor('connected', image.shape, 26)
     region = Region(seed_coords, neighbor_element)
@@ -40,11 +40,11 @@ if __name__ == "__main__":
     optimizer_AC_image = optimizer_AC.compute(rsrg_region, image)
 
     optimal_regions = []
-    optimal_images = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(optimizer_AC_image)))
+    optimal_images = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(optimizer_AC_image))).astype(np.int64)
     for i in range(len(optimizer_AC_image)):
         index = optimizer_AC_image[i].argmax()
         optimal_regions.append([rsrg_region[i][index]])
-        labels = rsrg_region[i][index].get_label()
+        labels = rsrg_region[i][index].get_label().astype(np.int64)
         print 'len(labels): => ', len(labels)
         optimal_images[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
         print 'i: ', i, '   => ', (optimal_images[..., i] == 1).sum(), '    index => ', index

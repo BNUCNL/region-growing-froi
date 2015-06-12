@@ -1,153 +1,53 @@
-import time
 
-import numpy as np
+import time
 import nibabel as nib
 
 from algorithm.region_growing import *
+from algorithm.neighbor import *
 from algorithm.similarity_criteria import *
 from algorithm.stop_criteria import *
-
+from algorithm.region import *
+from algorithm.optimizer import *
 
 if __name__ == "__main__":
+    #load data
     starttime = time.clock()
-
-    mask = nib.load("../data/prior/prob_rFFA.nii.gz")
-    mask = mask.get_data()
-
-    # # seed_coords = np.array(np.nonzero(mask >= 0.6)).T
-
-    # seed_coords = np.array([[31, 30, 8]])
-    #
-    # neighbor_element = SpatialNeighbor('connected', mask.shape, 26)
-    # region = Region(seed_coords, neighbor_element)
-
-
-    # similarity_criteria = SimilarityCriteria('euclidean', 0.8)
-    similarity_criteria = SimilarityCriteria('euclidean')
-    stop_criteria = StopCriteria('size')
-
-    image = nib.load(ACTIVATION_DATA_DIR)
+    image = nib.load("../data/S1/zstat1.nii.gz")
     affine = image.get_affine()
     image = image.get_data()
 
-    # threshold = np.array((300, ))
-    threshold = np.arange(10, 410, 10)
+    seed_coords = np.array([[28, 29, 29]]) # r_OFA seed point: [28, 29, 29]
+    neighbor_element = SpatialNeighbor('connected', image.shape, 26)
+    region = Region(seed_coords, neighbor_element)
+
+    similarity_criteria = SimilarityCriteria('euclidean')
+    stop_criteria = StopCriteria('size')
+    threshold = np.array((50, 100, 150, 200))
+
     srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
+    srg_region = srg.compute(region, image, threshold)
 
-    #save the subject id to lines list
-    lines = []
-    for line in open(SUBJECT_ID_DIR):
-        if line is not '':
-            lines.append(line.rstrip('\n'))
+    result_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(srg_region)))
+    for i in range(len(srg_region)):
+        labels = srg_region[i].get_label()
+        result_image[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
 
-    # for i in range(len(ROI)):
-    for i in range(2, 3):
-        document_PC = Document()
-        document_AC = Document()
-        document_AC.add_heading(ROI[i] + ' AC Analysis', 0)
-        document_PC.add_heading(ROI[i] + ' PC Analysis', 0)
+    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_srg.nii.gz")
 
-        AC_roi_regions_result = np.zeros((image.shape[3], 1, len(threshold)))
-        PC_roi_regions_result = np.zeros((image.shape[3], 1, len(threshold)))
+    #AC
+    optimizer_AC = Optimizer('AC')
+    optimizer_AC_image = optimizer_AC.compute([srg_region], image)
+    #PC
+    # optimizer_PC = Optimizer('PC')
+    # optimier_PC_image = optimizer_PC.compute(rsrg_region, image[..., j])
 
-        PC_region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], image.shape[3]), dtype=int)
-        AC_region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], image.shape[3]), dtype=int)
+    index = optimizer_AC_image[0].argmax()
+    optimal_regions = srg_region[index]
+    labels = optimal_regions.get_label()
 
-        # for j in range(0, 100):
-        for j in range(0, image.shape[3]):
-            seed_coords = np.array([roi_peak_points[j, i, :]]).astype(np.int)
-            neighbor_element = SpatialNeighbor('connected', mask.shape, 26)
-            region = Region(seed_coords, neighbor_element)
-
-            regions = []
-            srg_region = srg.compute(region, image[..., j], threshold)
-            regions.append(srg_region)
-
-            #AC
-            optimizer_AC = Optimizer('AC')
-            optimizer_AC_image = optimizer_AC.compute(regions, image[..., j])
-            AC_roi_regions_result[j, :] = optimizer_AC_image[:]
-            title_AC = str(j + 1) + '. ' + lines[j ] + ' --  ' + ROI[i] + ' AC Analysis'
-            show_date_index_formatter(threshold, optimizer_AC_image[0, :], 'Threshold', 'AC Value', title_AC, 'g', True)
-
-            region_size_AC = threshold[optimizer_AC_image.reshape(len(threshold),).argmax()]
-
-            document_AC.add_heading(str(j + 1) + '. ' + lines[j], 1)
-            document_AC.add_paragraph('Peak Point:  ' + str(roi_peak_points[j, i, :]), style='ListBullet')
-            document_AC.add_paragraph('Region Optimal Size:  ' + str(region_size_AC), style='ListBullet')
-            document_AC.add_paragraph('AC Value MAX:  ' +  str(optimizer_AC_image.max()), style='ListBullet')
-            document_AC.add_picture(TEMP_IMG_DIR, width=Inches(4.0))
-
-            #PC
-            optimizer_PC = Optimizer('PC')
-            optimier_PC_image = optimizer_PC.compute(regions, image[..., j])
-            PC_roi_regions_result[j, :] = optimier_PC_image[:]
-            title_PC = str(j + 1) + '. ' + lines[j ] + ' --  ' + ROI[i] + ' PC Analysis'
-            show_date_index_formatter(threshold, optimier_PC_image[0, :], 'Threshold', 'PC Value', title_PC, 'b', True)
-
-            region_size_PC = threshold[optimier_PC_image.reshape(len(threshold),).argmax()]
-
-            document_PC.add_heading(str(j + 1) + '. ' + lines[j ], 1)
-            document_PC.add_paragraph('Peak Point:  ' + str(roi_peak_points[j, i, :]), style='ListBullet')
-            document_PC.add_paragraph('Region Optimal Size:  ' + str(region_size_PC), style='ListBullet')
-            document_PC.add_paragraph('PC Value MAX:  ' +  str(optimier_PC_image.max()), style='ListBullet')
-            document_PC.add_picture( TEMP_IMG_DIR, width=Inches(4.0))
-
-            #Save data to nii.gz
-            AC_labels = srg_region[optimizer_AC_image.reshape(len(threshold),).argmax()].get_label()
-            AC_region_image[AC_labels[:, 0], AC_labels[:, 1], AC_labels[:, 2], j] = 1
-            PC_labels = srg_region[optimier_PC_image.reshape(len(threshold),).argmax()].get_label()
-            PC_region_image[PC_labels[:, 0], PC_labels[:, 1], PC_labels[:, 2], j] = 1
-
-            print 'i:', i, '        j: ', j, '       subject_id:', lines[j]
-
-        document_AC.save(ASRG_RESULT_DOC_DATA_DIR + ROI[i] + '_' + AC_RESULT_DOCX_FILE)
-        np.save(ASRG_RESULT_DOC_DATA_DIR + ROI[i] + '_' + AC_RESULT_NPY_FILE, AC_roi_regions_result)
-        document_PC.save(ASRG_RESULT_DOC_DATA_DIR + ROI[i] + '_' + PC_RESULT_DOCX_FILE)
-        np.save(ASRG_RESULT_DOC_DATA_DIR + ROI[i] + '_' + PC_RESULT_NPY_FILE, PC_roi_regions_result)
-
-        nib.save(nib.Nifti1Image(AC_region_image, affine), ASRG_RESULT_DOC_DATA_DIR + ROI[i] + '_' + AC_OPTIMAL_FILE)
-        nib.save(nib.Nifti1Image(PC_region_image, affine), ASRG_RESULT_DOC_DATA_DIR + ROI[i] + '_' + PC_OPTIMAL_FILE)
-
-    print '-----------------------------------------------------------------------------------------'
-    read_npy_data = np.load(ASRG_RESULT_DOC_DATA_DIR + ROI[0] + '_' + AC_RESULT_NPY_FILE)
-    print 'read_npy_data(AC): \n', read_npy_data
-    print '-----------------------------------------------------------------------------------------'
-    read_npy_data = np.load(ASRG_RESULT_DOC_DATA_DIR + ROI[0] + '_' + PC_RESULT_NPY_FILE)
-    print 'read_npy_data(PC): \n', read_npy_data
+    result_image = np.zeros_like(image)
+    result_image[labels[:, 0], labels[:, 1], labels[:, 2]] = 1
+    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_asrg_images.nii.gz")
 
     endtime = time.clock()
-    print(endtime - starttime)
-    print "Program end..."
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    print 'Cost time:: ', np.round((endtime - starttime), 3), ' s'
