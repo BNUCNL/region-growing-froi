@@ -131,13 +131,10 @@ class RandomSRG(SeededRegionGrowing):
         """
         regions = []
         coords = region.seed_sampling(self.seed_sampling_num)
-        i = 0
         for seed in coords:
             region.set_seed(seed.reshape((-1, 3)))
             reg = super(RandomSRG, self).compute(region, image, threshold)
             regions.append(copy.copy(reg))
             self.stop_criteria.set_stop()
-            print 'i: ', i
-            i += 1
 
         return regions

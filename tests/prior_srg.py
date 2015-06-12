@@ -1,11 +1,13 @@
 __author__ = 'zhenzonglei'
 
 import time
-
 import nibabel as nib
 
 from algorithm.region_growing import *
 from algorithm.neighbor import *
+from algorithm.similarity_criteria import *
+from algorithm.stop_criteria import *
+from algorithm.region import *
 
 if __name__ == "__main__":
     # image to be segmanted

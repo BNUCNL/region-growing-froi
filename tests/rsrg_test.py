@@ -21,7 +21,8 @@ if __name__ == "__main__":
     mask = nib.load("../data/prior/prob_rFFA.nii.gz")
     mask = mask.get_data()
 
-    seed_coords = np.array(np.nonzero(mask >= 0.6)).T
+    seed_coords = np.array(np.nonzero(mask >= 0.5)).T
+    print 'seed_coords.shape => ', seed_coords.shape
     neighbor_element = SpatialNeighbor('connected', image.shape, 26)
     region = Region(seed_coords, neighbor_element)
 
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     stop_criteria = StopCriteria('size')
     threshold = np.array((200, 300, 400, 500))
 
-    similarity_criteria.set_rand_neighbor_prop(0.7)
+    # similarity_criteria.set_rand_neighbor_prop(0.7)
     seed_sampling_num = 10
     rsrg = RandomSRG(similarity_criteria, stop_criteria, seed_sampling_num)
     rsrg_region = rsrg.compute(region, image, threshold)
@@ -44,8 +45,9 @@ if __name__ == "__main__":
         index = optimizer_AC_image[i].argmax()
         optimal_regions.append([rsrg_region[i][index]])
         labels = rsrg_region[i][index].get_label()
+        print 'len(labels): => ', len(labels)
         optimal_images[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
-        print 'i: ', i, '   => ', (optimal_images[..., index] == 1).sum()
+        print 'i: ', i, '   => ', (optimal_images[..., i] == 1).sum(), '    index => ', index
     nib.save(nib.Nifti1Image(optimal_images, affine), "../data/S1/zstat1_rsrg_optimal_images.nii.gz")
 
     #PC
