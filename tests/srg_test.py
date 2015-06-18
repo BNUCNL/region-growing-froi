@@ -3,7 +3,6 @@ import time
 import nibabel as nib
 
 from algorithm.region_growing import *
-from algorithm.neighbor import *
 from algorithm.similarity_criteria import *
 from algorithm.stop_criteria import *
 from algorithm.region import *

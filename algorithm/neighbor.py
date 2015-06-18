@@ -138,7 +138,6 @@ class SpatialNeighbor(object):
 
         return utils.unique2d(coords)
 
-
 def is_in_image(coords, image_shape):
     """
     Check whether the coordinates is in the range of image.

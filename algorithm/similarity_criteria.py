@@ -62,7 +62,6 @@ class SimilarityCriteria:
             represent the current region and associated attributes
         prior_image: numpy 2d/3d/4d array, optional
             A image to provide the prior or weight that a point belongs to the region
-
         """
         lsize = region.label_size()
         nsize = region.neighbor_size()
@@ -200,3 +199,39 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
 
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
         return nearest_neighbor.reshape((-1, 3))
+
+class SlicBasedSimilarityCriteria:
+    """
+    The object to compute the similarity between the labeled region and its neighbors
+    Attributes
+    metric: str,optional
+    A description for the metric type
+    Methods
+    compute(region, image, prior_image=None)
+        Do computing the similarity between the labeled region and its neighbors
+    """
+
+    def __init__(self, metric='educlidean'):
+        """
+        Parameters
+        metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
+        rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
+        """
+        if not isinstance(metric, str):
+            raise ValueError("The metric must be a str. ")
+
+        self.metric = metric
+
+    def compute(self, region, image):
+        neighbor_values = region.get_neighbor_value()
+        neighbor_region_means = np.zeros((len(neighbor_values), ))
+        slic_image = region.get_slic_image()
+        for i in range(len(neighbor_values)):
+            neighbor_region_means[i] = image[slic_image == neighbor_values[i]].mean()
+
+        nearest_neighbor = neighbor_values[neighbor_region_means.argmax()]
+
+        return nearest_neighbor
+
+
+

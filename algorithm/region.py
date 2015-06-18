@@ -174,3 +174,114 @@ class Region(object):
 
         return self.label[boundary, :]
 
+
+class SlicRegion(object):
+    """
+    An object to represent the region and its associated attributes
+    Attributes
+    seed: list of tuple coordinates [(x1,y1,z1),(x2,y2,z2),]
+        The element of the list is a series tuples, each of which in turn holds the coordinates of a point
+    label: numpy 2d array
+        The coordinates of the points which have been merged into the regions
+    neighbor: numpy 2 array
+        The coordinates of the points which is the neighbor of the merged region
+
+    """
+
+    def __init__(self, seed, slic_image):
+        """
+        Parameters
+        label: numpy 2d array
+            Each row represents the coordinates for a pixels. Number of the rows is the number of pixels
+        neighbor: numpy 2d array
+            Each row represents the coordinates for a pixels
+
+        """
+
+        self.seed = seed.tolist()
+        self.slic_image = slic_image
+        self.label = self.seed
+        self.neighbor = []
+        self.add_neighbor(seed)
+
+    def label_size(self):
+        """
+        Return the size of current label.
+        """
+        return len(self.label)
+
+    def neighbor_size(self):
+        """
+        Return the size of current neighbor.
+        """
+        return len(self.neighbor)
+
+    def add_label(self, label):
+        if label not in self.label and label in self.neighbor:
+            self.label.append(label)
+
+    def set_label(self, label):
+        """
+        Set the coordinates of new label to the label of region.
+        Parameters
+        neighbor: numpy 2d array
+            Each row represents the coordinates for a pixels
+        """
+
+        if not isinstance(label, list):
+            label = [label]
+        self.labels = label
+
+
+    def get_label_vaue(self):
+        """
+        Get the the coordinates of the labeled pixels
+        """
+        return self.label
+
+    def get_label(self):
+        region_image = np.zeros_like(self.slic_image)
+        for label in self.label:
+            region_image[self.slic_image == label] = 1
+
+        return np.array(np.nonzero(region_image)).T
+
+    def add_neighbor(self, label):
+        #only compute for 3D or 2D image
+        from scipy.ndimage.morphology import binary_dilation
+        #compute new neighbors
+        neighbor_slic = binary_dilation(self.slic_image == label)
+        neighbor_slic[self.slic_image == label] = 0
+        neighbor_values = np.unique(self.slic_image[neighbor_slic > 0])
+        neighbor_values = np.delete(neighbor_values, 0)
+
+        for neighbor_value in neighbor_values:
+            if neighbor_value not in self.label and neighbor_value not in self.neighbor:
+                self.neighbor.append(neighbor_value)
+
+    def remove_neighbor(self, neighbor):
+        if neighbor in self.neighbor:
+            self.neighbor.remove(neighbor)
+
+    def get_neighbor_value(self):
+        """
+        Get the coordinates of the labeled pixels
+        """
+        return self.neighbor
+
+    def get_neighbor(self):
+        region_image = np.zeros_like(self.slic_image)
+        for neighbor in self.neighbor:
+            region_image[self.slic_image == neighbor] = 1
+        return np.array(np.nonzero(region_image)).T
+
+    def get_slic_image(self):
+        return self.slic_image
+
+
+    def compute_boundary(self):
+
+        """
+            Compute the  boundary for the label
+        """
+        return self.neighbor

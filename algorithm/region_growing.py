@@ -67,7 +67,7 @@ class SeededRegionGrowing(object):
                 The regions are generated for each threshold, one region for one threshold
         """
         regions = []
-        region = copy.copy(region)
+        region = copy.deepcopy(region)
         for thr in threshold:
             while not self.stop_criteria.isstop():
                 # find the nearest neighbor for the current region
@@ -80,11 +80,10 @@ class SeededRegionGrowing(object):
                 region.add_neighbor(nearest_neighbor)
                 # Update the stop criteria
                 self.stop_criteria.compute(region, image, thr)
-            regions.append(copy.copy(region))
+            regions.append(copy.deepcopy(region))
             self.stop_criteria.set_stop()
 
         return regions
-
 
 class RandomSRG(SeededRegionGrowing):
     """
@@ -136,11 +135,10 @@ class RandomSRG(SeededRegionGrowing):
         for seed in coords:
             region.set_seed(seed.reshape((-1, 3)))
             reg = super(RandomSRG, self).compute(region, image, threshold)
-            regions.append(copy.copy(reg))
+            regions.append(copy.deepcopy(reg))
             self.stop_criteria.set_stop()
 
         return regions
-
 
 class SlicSRG(SeededRegionGrowing):
     """
@@ -157,7 +155,7 @@ class SlicSRG(SeededRegionGrowing):
         Do region growing
     """
 
-    def __init__(self, similarity_criteria, stop_criteria, mask_image=None):
+    def __init__(self, similarity_criteria, stop_criteria, n_segmentation = 10000, mask_image=None):
         """
         Initialize the object
         Parameters
@@ -168,110 +166,31 @@ class SlicSRG(SeededRegionGrowing):
         """
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
+        self.n_segmentation = n_segmentation
         self.mask_image = mask_image
 
-    def convert_image_to_supervoxel(self, volume, n_segmentation=1000):
+    def set_n_segmentation(self, n_segmentation):
+        self.n_segmentation = n_segmentation
+
+    def get_n_segmentation(self):
+        return self.n_segmentation
+
+    def get_slic_image(self, image):
         from skimage.segmentation import slic
 
-        gray_image = (volume - volume.min()) * 255 / (volume.max() - volume.min())
+        gray_image = (image - image.min()) * 255 / (image.max() - image.min())
         slic_image = slic(gray_image.astype(np.float),
-                          n_segments=n_segmentation,
+                          n_segments=self.n_segmentation,
                           slic_zero=True,
                           sigma=2,
                           multichannel=False,
                           enforce_connectivity=True)
         return slic_image
 
-    def compute_slic_max_region_mean(self, volume, region_volume, slic_image):
-        from scipy.ndimage.morphology import binary_dilation
-
-        neighbor_slic = binary_dilation(region_volume)
-        neighbor_slic[region_volume > 0] = 0
-
-        neighbor_values = np.unique(slic_image[neighbor_slic > 0])
-        # print 'neighbor_values: ', neighbor_values
-
-        region_means = np.zeros((len(neighbor_values - 1), ))
-        for i in range(len(neighbor_values)):
-            if neighbor_values[i] != 0:
-                neighbor_slic[slic_image == neighbor_values[i]] = 1
-                region_means[i] = volume[slic_image == neighbor_values[i]].mean()
-
-        return neighbor_slic, slic_image == neighbor_values[region_means.argmax()]
-
-    def compute_optional_region_based_AC_value(self, volume, regions, neighbor_slics):
-        AC_values = np.zeros((regions.shape[3], ))
-        for i in range(regions.shape[3]):
-            AC_values[i] = volume[regions[..., i] > 0].mean() - volume[neighbor_slics[..., i] > 0].mean()
-
-        # print 'AC_values: ', AC_values
-        return regions[..., AC_values.argmax()]
-
-    def supervoxel_based_regiongrowing(self, slic_image, volume, seed, size=10):
-        seed_region = np.zeros_like(slic_image)
-        seed_region[slic_image == slic_image[seed[:, 0], seed[:, 1], seed[:, 2]]] = 1
-
-        seed_regions = np.zeros((seed_region.shape[0], seed_region.shape[1], seed_region.shape[2], size))
-        seed_regions[..., 0] = seed_region
-        neighbor_slics = np.zeros((seed_region.shape[0], seed_region.shape[1], seed_region.shape[2], size))
-
-        for i in range(0, size - 1):
-            neighbor_slic, best_parcel = self.compute_slic_max_region_mean(volume, seed_region, slic_image)
-            seed_region[best_parcel] = 1
-            seed_regions[..., i + 1] = seed_region
-            neighbor_slics[..., i] = neighbor_slic
-
-        neighbor_slics[..., size - 1] = self.compute_slic_max_region_mean(volume, seed_region, slic_image)[0]
-
-        return neighbor_slics, seed_regions
-
     # def compute(self, region, image, threshold):
-    def compute(self, seed, slic_image, image, threshold):
-        """
-        Aggregation for different regions
-        Parameters
-        region: Region object
-            seeded region for growing
-        image: numpy 2d/3d/4d array
-            The numpy array to represent 2d/3d/4d image to be segmented. In 4d image, the first 3D is spatial dimension
-            and the 4th dimension is time or feature dimension
-        threshold: a numpy nd array
-            Stop threshold for growing
-        Returns
-        regions:  a 2D list of Region object
-            The regions are generated for each seed and each threshold. As a result, regions are a 2D list.
-            The first dim is for seeds, and the second dim is for threshold
-        """
-        # regions = []
-        # coords = region.seed_sampling(self.seed_sampling_num)
-        # for seed in coords:
-        #     region.set_seed(seed.reshape((-1, 3)))
-        #     reg = super(RandomSRG, self).compute(region, image, threshold)
-        #     regions.append(copy.copy(reg))
-        #     self.stop_criteria.set_stop()
-        #
-        # return regions
+    #     return super(SlicSRG, self).compute(region, image, threshold)
 
-        # (slic_image, volume, seed, size=10)
-        size = 10
 
-        seed = np.array(seed)
-        seed_region = np.zeros_like(slic_image)
-        seed_region[slic_image == slic_image[seed[0], seed[1], seed[2]]] = 1
-
-        seed_regions = np.zeros((seed_region.shape[0], seed_region.shape[1], seed_region.shape[2], size))
-        seed_regions[..., 0] = seed_region
-        neighbor_slics = np.zeros((seed_region.shape[0], seed_region.shape[1], seed_region.shape[2], size))
-
-        for i in range(0, size - 1):
-            neighbor_slic, best_parcel = self.compute_slic_max_region_mean(image, seed_region, slic_image)
-            seed_region[best_parcel] = 1
-            seed_regions[..., i + 1] = seed_region
-            neighbor_slics[..., i] = neighbor_slic
-
-        neighbor_slics[..., size - 1] = self.compute_slic_max_region_mean(image, seed_region, slic_image)[0]
-
-        return neighbor_slics, seed_regions
 
 
 
