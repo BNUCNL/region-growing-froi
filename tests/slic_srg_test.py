@@ -1,7 +1,6 @@
 __author__ = 'zgf'
 
 import time
-
 import nibabel as nib
 
 from algorithm.region_growing import *
@@ -40,6 +39,7 @@ if __name__ == "__main__":
         result_image[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
 
     nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_slic_srg.nii.gz")
+
 
     #AC
     optimizer_AC = Optimizer('AC')

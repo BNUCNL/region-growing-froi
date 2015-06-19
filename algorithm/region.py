@@ -94,7 +94,6 @@ class Region(object):
         """
         return self.neighbor_element
 
-
     def add_label(self, label):
         """
         Add the coordinates of new label to the label of region.
@@ -175,7 +174,7 @@ class Region(object):
         return self.label[boundary, :]
 
 
-class SlicRegion(object):
+class SlicRegion(Region):
     """
     An object to represent the region and its associated attributes
     Attributes
