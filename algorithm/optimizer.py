@@ -1,3 +1,4 @@
+
 from algorithm.neighbor import *
 
 class Optimizer(object):

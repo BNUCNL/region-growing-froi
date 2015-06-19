@@ -240,13 +240,34 @@ class MultiSeedsSRG(SeededRegionGrowing):
             regions[nearest_neighbor_label].add_label(nearest_neighbor_cord)
             # remove the nearest neighbor from the current neighbor
             region[nearest_neighbor_label].remove_neighbor(nearest_neighbor_cord)
+
+            last_neighbor_size = region[nearest_neighbor_label].get_neighbor().shape[0]
+            new_neighbors = region[nearest_neighbor_label].get_neighbor()[..., last_neighbor_size:]
+            print 'new_neighbors: ', new_neighbors
+
+            # for i in range(len(new_neighbors)):
+            #     new_neighbor = new_neighbors[..., i]
+            #     for region in regions:
+            #         if new_neighbor in region.get_neighbor():
+            #             np.delete(new_neighbors, i)
+            #             break
+
             # compute the neighbor of the new added pixel and put it into the current neighbor
             region[nearest_neighbor_label].add_neighbor(nearest_neighbor_cord)
+
             # Update the stop criteria
             self.stop_criteria.compute(regions, image)
             self.stop_criteria.set_stop()
 
         return regions
+
+
+
+
+
+
+
+
 
 
 
