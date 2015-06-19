@@ -20,9 +20,6 @@ if __name__ == "__main__":
     neighbor_element = SpatialNeighbor('connected', image.shape, 26)
     region = Region(seed_coords, neighbor_element)
 
-    print 'seed_coords.shape: ', seed_coords.shape
-    print seed_coords[:, 0], ' =>', seed_coords[:, 1], '  =>', seed_coords[:, 2]
-
     similarity_criteria = SimilarityCriteria('euclidean')
     stop_criteria = StopCriteria('size')
     threshold = np.array((50, 100, 150, 200))
