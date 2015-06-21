@@ -216,7 +216,41 @@ class MultiSeedsSRG(SeededRegionGrowing):
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
 
-    def compute(self, region, image, threshold):
+        #dict: key - neighbor_cord, value - neighbor_delta
+        self.ssl = {}
+        #boundary -1 ,  unlabel 0, label 1...n
+        self.boundary = []
+
+    def get_ssl(self):
+        return self.ssl
+
+    def clear_ssl(self):
+        self.ssl.clear()
+
+    def get_boundary(self):
+        return self.boundary
+
+    def add_ssl_element(self, cord, label):
+        self.ssl[cord] = label
+
+    def add_boundary_element(self, cord):
+        self.boundary.append(cord)
+
+    def remove_ssl_element(self, key):
+        del self.ssl[key]
+
+    def init_ssl(self, regions, image):
+        for i in range(len(regions)):
+            neighbors = regions[i].get_neighbor()
+            labels = regions[i].get_label()
+            mean = image[labels[:, 0], labels[:, 1], labels[:, 2]].mean()
+            for j in range(neighbors.shape[0]):
+                if not self.ssl.has_key(tuple(neighbors[j, :])):
+                    neighbor_value = image[tuple(neighbors[j, :])]
+                    self.add_ssl_element(tuple(neighbors[j, :]), abs(neighbor_value - mean))
+            regions[i].set_neighbor(None)
+
+    def compute(self, multi_seeds_regions, image, threshold, neighbor_element):
         """
         Region grows based on the attributes seeds,similarity and stop criterion
         Parameters
@@ -231,29 +265,52 @@ class MultiSeedsSRG(SeededRegionGrowing):
             region: a list of region object
                 The regions are generated for each threshold, one region for one threshold
         """
-        regions = []
-        regions = copy.deepcopy(regions)
-        while not self.stop_criteria.isstop():
-            # find the nearest neighbor for the current region
-            nearest_neighbor_label, nearest_neighbor_cord = self.similarity_criteria.compute(regions, image)
-            # add the nearest neighbor to the region
-            regions[nearest_neighbor_label - 1].add_label(nearest_neighbor_cord)
-            self.similarity_criteria.remove_ssl_element(nearest_neighbor_cord)
-            # remove the nearest neighbor from the current neighbor
-            region[nearest_neighbor_label - 1].remove_neighbor(nearest_neighbor_cord)
+        result_regions = []
+        regions = copy.deepcopy(multi_seeds_regions)
+        result_image = np.zeros_like(image).astype(np.int)
+        for i in range(len(regions)):
+            labels = regions[i].get_label()
+            result_image[labels[:, 0], labels[:, 1], labels[:, 2]] = i + 1 #mark the label
+        self.init_ssl(regions, image)
 
-            last_neighbor_size = region[nearest_neighbor_label - 1].get_neighbor().shape[0]
-            new_neighbors = region[nearest_neighbor_label - 1].get_neighbor()[..., last_neighbor_size:]
-            print 'new_neighbors: ', new_neighbors
+        for thr in threshold:
+            while not self.stop_criteria.isstop():
+                # find the nearest neighbor for the current region
+                min_delta_key, nearest_neighbor_cord = self.similarity_criteria.compute(regions, image, self.ssl)
 
-            # compute the neighbor of the new added pixel and put it into the current neighbor
-            region[nearest_neighbor_label - 1].add_neighbor(nearest_neighbor_cord, self.similarity_criteria, nearest_neighbor_label)
+                neighbors = neighbor_element.compute(nearest_neighbor_cord)
+                neighbor_values = result_image[neighbors[:, 0], neighbors[:, 1], neighbors[:, 2]]
 
-            # Update the stop criteria
-            self.stop_criteria.compute(regions, image)
+                unique_values = np.unique(neighbor_values)
+                if len(unique_values) != 2:
+                    self.add_boundary_element(nearest_neighbor_cord)
+                    result_image[tuple(nearest_neighbor_cord)] = -1 #boundary label value
+                else:
+                    new_label = np.unique(neighbor_values)[1] #[0, new label]
+                    result_image[tuple(nearest_neighbor_cord)] = new_label
+                    #update the corresponding region mean
+                    new_region_mean = image[result_image == new_label].mean()
+
+                    for i in range(neighbors.shape[0]):
+                        cord = neighbors[i, :]
+                        value = result_image[tuple(cord)]
+
+                        if value == 0 and not self.ssl.has_key(tuple(cord)) :
+                            self.add_ssl_element(tuple(cord), abs(image[tuple(cord)] - new_region_mean))
+                # add the nearest neighbor to the region
+                regions[new_label - 1].add_label(nearest_neighbor_cord.reshape(-1, 3))
+                self.remove_ssl_element(min_delta_key)
+
+                # Update the stop criteria
+                self.stop_criteria.compute(regions, self.get_ssl(), thr)
+
             self.stop_criteria.set_stop()
+            result_regions.append(copy.deepcopy(regions))
+            print 'thr: ', thr, ' finished.'
+            # self.clear_ssl()
 
-        return regions
+        return result_regions
+
 
 
 

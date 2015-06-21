@@ -10,6 +10,7 @@ from algorithm.region import *
 
 if __name__ == "__main__":
     #load data
+    #load data
     starttime = time.clock()
     image = nib.load("../data/S1/zstat1.nii.gz")
     affine = image.get_affine()
@@ -31,25 +32,20 @@ if __name__ == "__main__":
     l_pFus_region = Region(l_pFus_seed_coords, neighbor_element)
     regions = [r_OFA_region, l_OFA_region, r_pFus_region, l_pFus_region]
 
+    multi_seeds_stop_criteria = MultiSeedsStopCriteria('size')
+    threshold = np.array((100, 300, 600, 900, 1200))
+
     multi_seeds_similarity_criteria = MultiSeedsSimilarityCriteria('euclidean')
-    for i in range(len(regions)):
-        for neighbor in regions[i].get_neighbor():
-            multi_seeds_similarity_criteria.add_ssl_element(neighbor, i)
+    multi_seeds_srg = MultiSeedsSRG(multi_seeds_similarity_criteria, multi_seeds_stop_criteria)
+    multi_seeds_srg_region = multi_seeds_srg.compute(regions, image, threshold, neighbor_element)
 
-    stop_criteria = StopCriteria('size')
-    threshold = np.array((1600, ))
+    result_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(multi_seeds_srg_region)))
+    for i in range(len(multi_seeds_srg_region)):
+        for j in range(len(multi_seeds_srg_region[i])):
+            roi_label = multi_seeds_srg_region[i][j].get_label()
+            result_image[roi_label[:, 0], roi_label[:, 1], roi_label[:, 2], i] = j + 1
 
-
-    multi_seeds_srg = MultiSeedsSRG(multi_seeds_similarity_criteria, stop_criteria)
-    srg_region = multi_seeds_srg.compute(regions, image, threshold)
-
-
-    result_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(srg_region)))
-    for i in range(len(srg_region)):
-        labels = srg_region[i].get_label()
-        result_image[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
-
-    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_srg.nii.gz")
+    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_multi_seeds_srg.nii.gz")
 
     endtime = time.clock()
     print 'Cost time:: ', np.round((endtime - starttime), 3), ' s'

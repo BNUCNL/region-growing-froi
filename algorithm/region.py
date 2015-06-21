@@ -130,7 +130,16 @@ class Region(object):
         """
         Get the the coordinates of the neighbor pixels
         """
+        if self.neighbor == None:
+            self.add_neighbor(self.label)
         return self.neighbor
+
+    def set_neighbor(self, neighbor):
+        """
+        Set the the coordinates of the neighbor pixels
+        """
+
+        self.neighbor = neighbor
 
     def add_neighbor(self, neighbor):
         """
@@ -320,3 +329,5 @@ class SlicRegion(Region):
             Compute the  boundary for the label
         """
         return self.neighbor
+
+

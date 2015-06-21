@@ -83,12 +83,9 @@ class MultiSeedsStopCriteria(StopCriteria):
             A description for the metric type. The supported types include 'homogeneity','size','gradient'.
             Default is 'size'
         """
-        if criteria_metric == 'size' or criteria_metric == 'homogeneity' or criteria_metric == 'gradient':
-            self.metric = criteria_metric
+        super(MultiSeedsStopCriteria, self).__init__(criteria_metric)
 
-        self.stop = stop
-
-    def compute(self, regions, image, threshold=None):
+    def compute(self, regions, ssl, threshold=None):
         """
         compute the metric of region according to the region and judge whether the metric meets the stop threshold
         Parameters
@@ -99,12 +96,10 @@ class MultiSeedsStopCriteria(StopCriteria):
         threshold: float, optional
             The default is None which means the adaptive method will be used.
         """
-        neighbors_sum = 0
         labels_sum = 0
         for region in regions:
-            neighbors_sum += region.get_neighbor().shape[0] #The neighbors has been labeled.
             labels_sum += region.get_label().shape[0]
 
-        if (threshold and labels_sum < threshold) or neighbors_sum == 0:
+        if len(ssl) == 0 or labels_sum > threshold:
             self.stop = True
 
