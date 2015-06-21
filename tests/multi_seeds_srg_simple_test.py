@@ -21,16 +21,16 @@ if __name__ == "__main__":
     l_pFus_seed_coords = np.array([[65, 42, 26]])
     seed_coords = [r_OFA_seed_coords, l_OFA_seed_coords, r_pFus_seed_coords, l_pFus_seed_coords]
 
-    ssl_cords = []
+    ssl_cords = {}
     ssl_delta = []
     boundary = []
 
     #boundary -1 ,  unlabel 0, label 1...n
-    result_image = np.zeros_like(image)
+    result_image = np.zeros_like(image).astype(np.int)
     neighbor_element = SpatialNeighbor('connected', image.shape, 26)
 
     for i in range(len(seed_coords)):
-        result_image[seed_coords[i][:, 0], seed_coords[i][:, 1], seed_coords[i][:, 2]] =  i + 1
+        result_image[seed_coords[i][:, 0], seed_coords[i][:, 1], seed_coords[i][:, 2]] = i + 1
         neighbors = neighbor_element.compute(seed_coords[i])
         mean = image[result_image == i + 1].mean()
         for j in range(neighbors.shape[0]):
@@ -38,7 +38,7 @@ if __name__ == "__main__":
             neighbor_value = image[tuple(neighbors[j, :])]
             ssl_delta.append(abs(neighbor_value - mean))
 
-    all_regions_size = 40
+    all_regions_size = 1200
     # while len(ssl_cords) > 0 or (result_image > 0).sum() < all_regions_size:
     while (result_image > 0).sum() < all_regions_size:
         min_index = np.array(ssl_delta).argmin()
@@ -53,20 +53,18 @@ if __name__ == "__main__":
             result_image[tuple(nearest_neighbor_cord)] = -1 #boundary label value
         else:
             new_label = np.unique(neighbor_values)[1] #[0, new label]
-            print ' new_label: ', new_label
             result_image[tuple(nearest_neighbor_cord)] = new_label
             #update the corresponding region mean
             new_region_mean = image[result_image == new_label].mean()
-            print ' new_region_mean: ', new_region_mean
 
             for i in range(neighbors.shape[0]):
                 cord = neighbors[i, :]
                 value = result_image[tuple(cord)]
 
-                is_in_ssl_cords = False
+                is_in_ssl_cords = True
                 for element in ssl_cords:
                     if (cord == element).all():
-                        is_in_ssl_cords = True
+                        is_in_ssl_cords = False
                         break
                 if value == 0 and is_in_ssl_cords:
                     ssl_cords.append(cord)
