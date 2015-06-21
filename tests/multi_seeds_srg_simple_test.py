@@ -21,8 +21,7 @@ if __name__ == "__main__":
     l_pFus_seed_coords = np.array([[65, 42, 26]])
     seed_coords = [r_OFA_seed_coords, l_OFA_seed_coords, r_pFus_seed_coords, l_pFus_seed_coords]
 
-    ssl_cords = {}
-    ssl_delta = []
+    ssl = {} #dict: key - neighbor_cord, value - neighbor_delta
     boundary = []
 
     #boundary -1 ,  unlabel 0, label 1...n
@@ -34,15 +33,14 @@ if __name__ == "__main__":
         neighbors = neighbor_element.compute(seed_coords[i])
         mean = image[result_image == i + 1].mean()
         for j in range(neighbors.shape[0]):
-            ssl_cords.append(neighbors[j, :])
             neighbor_value = image[tuple(neighbors[j, :])]
-            ssl_delta.append(abs(neighbor_value - mean))
+            ssl[tuple(neighbors[j, :])] = abs(neighbor_value - mean)
 
     all_regions_size = 1200
     # while len(ssl_cords) > 0 or (result_image > 0).sum() < all_regions_size:
     while (result_image > 0).sum() < all_regions_size:
-        min_index = np.array(ssl_delta).argmin()
-        nearest_neighbor_cord = ssl_cords[min_index]
+        min_delta_key = ssl.keys()[np.array(ssl.values()).argmin()]
+        nearest_neighbor_cord = np.array(min_delta_key)
         print ' nearest_neighbor_cord: ', nearest_neighbor_cord
 
         neighbors = neighbor_element.compute(nearest_neighbor_cord)
@@ -61,19 +59,11 @@ if __name__ == "__main__":
                 cord = neighbors[i, :]
                 value = result_image[tuple(cord)]
 
-                is_in_ssl_cords = True
-                for element in ssl_cords:
-                    if (cord == element).all():
-                        is_in_ssl_cords = False
-                        break
-                if value == 0 and is_in_ssl_cords:
-                    ssl_cords.append(cord)
-                    new_value = abs(image[tuple(cord)] - new_region_mean)
-                    ssl_delta.append(new_value)
-        del ssl_cords[min_index] #delete neighbor from ssl
-        del ssl_delta[min_index]
+                if value == 0 and not ssl.has_key(tuple(cord)) :
+                    ssl[tuple(cord)] = abs(image[tuple(cord)] - new_region_mean)
+        del ssl[min_delta_key] #delete neighbor from ssl
 
-        print '-------', (result_image > 0).sum(), '-----', len(boundary), '----', len(ssl_cords), '--------'
+        print '-------', (result_image > 0).sum(), '-----', len(boundary), '----', len(ssl), '--------'
 
     nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_multi_seeds_srg.nii.gz")
 
