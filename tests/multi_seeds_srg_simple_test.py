@@ -36,7 +36,7 @@ if __name__ == "__main__":
             neighbor_value = image[tuple(neighbors[j, :])]
             ssl[tuple(neighbors[j, :])] = abs(neighbor_value - mean)
 
-    all_regions_size = 1200
+    all_regions_size = 2000
     # while len(ssl_cords) > 0 or (result_image > 0).sum() < all_regions_size:
     while (result_image > 0).sum() < all_regions_size:
         min_delta_key = ssl.keys()[np.array(ssl.values()).argmin()]
@@ -46,7 +46,8 @@ if __name__ == "__main__":
         neighbors = neighbor_element.compute(nearest_neighbor_cord)
         neighbor_values = result_image[neighbors[:, 0], neighbors[:, 1], neighbors[:, 2]]
 
-        if len(np.unique(neighbor_values)) > 2:
+        unique_values = np.unique(neighbor_values)
+        if len(unique_values) != 2:
             boundary.append(nearest_neighbor_cord)
             result_image[tuple(nearest_neighbor_cord)] = -1 #boundary label value
         else:
