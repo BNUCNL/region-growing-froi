@@ -216,7 +216,7 @@ class MultiSeedsSRG(SeededRegionGrowing):
         self.similarity_criteria = similarity_criteria
         self.stop_criteria = stop_criteria
 
-    def compute(self, region, image):
+    def compute(self, region, image, threshold):
         """
         Region grows based on the attributes seeds,similarity and stop criterion
         Parameters
@@ -237,23 +237,17 @@ class MultiSeedsSRG(SeededRegionGrowing):
             # find the nearest neighbor for the current region
             nearest_neighbor_label, nearest_neighbor_cord = self.similarity_criteria.compute(regions, image)
             # add the nearest neighbor to the region
-            regions[nearest_neighbor_label].add_label(nearest_neighbor_cord)
+            regions[nearest_neighbor_label - 1].add_label(nearest_neighbor_cord)
+            self.similarity_criteria.remove_ssl_element(nearest_neighbor_cord)
             # remove the nearest neighbor from the current neighbor
-            region[nearest_neighbor_label].remove_neighbor(nearest_neighbor_cord)
+            region[nearest_neighbor_label - 1].remove_neighbor(nearest_neighbor_cord)
 
-            last_neighbor_size = region[nearest_neighbor_label].get_neighbor().shape[0]
-            new_neighbors = region[nearest_neighbor_label].get_neighbor()[..., last_neighbor_size:]
+            last_neighbor_size = region[nearest_neighbor_label - 1].get_neighbor().shape[0]
+            new_neighbors = region[nearest_neighbor_label - 1].get_neighbor()[..., last_neighbor_size:]
             print 'new_neighbors: ', new_neighbors
 
-            # for i in range(len(new_neighbors)):
-            #     new_neighbor = new_neighbors[..., i]
-            #     for region in regions:
-            #         if new_neighbor in region.get_neighbor():
-            #             np.delete(new_neighbors, i)
-            #             break
-
             # compute the neighbor of the new added pixel and put it into the current neighbor
-            region[nearest_neighbor_label].add_neighbor(nearest_neighbor_cord)
+            region[nearest_neighbor_label - 1].add_neighbor(nearest_neighbor_cord, self.similarity_criteria, nearest_neighbor_label)
 
             # Update the stop criteria
             self.stop_criteria.compute(regions, image)

@@ -201,7 +201,7 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         nearest_neighbor = region.neighbor[nbidx[dist.argmin()], :]
         return nearest_neighbor.reshape((-1, 3))
 
-class SlicBasedSimilarityCriteria:
+class SlicBasedSimilarityCriteria(SimilarityCriteria):
     """
     The object to compute the similarity between the labeled region and its neighbors
     Attributes
@@ -252,7 +252,25 @@ class MultiSeedsSimilarityCriteria(SimilarityCriteria):
         metric: 'euclidean', 'mahalanobis', 'minkowski','seuclidean', 'cityblock',ect. Default is 'euclidean'.
         rand_neighbor_prop: Tge proportion of neighbors in calculating the similarity
         """
-        super(PriorBasedSimilarityCriteria, self).__init__(metric)
+        self.ssl = {}
+        self.boundary = []
+
+    def get_ssl(self):
+        return self.ssl
+
+    def get_boundary(self):
+        return self.boundary
+
+    def add_ssl_element(self, cord, label):
+        self.ssl[label] = cord
+
+    def add_boundary_element(self, cord):
+        self.boundary.append(cord)
+
+    def remove_ssl_element(self, cord):
+        del self.ssl[dict]
+
+
 
     def compute(self, regions, image):
         regions_size = len(regions)
@@ -262,6 +280,7 @@ class MultiSeedsSimilarityCriteria(SimilarityCriteria):
         nearest_neighbor_label = 0
         nearest_neighbor_cord = None
         min_value = image.max() - image.min()
+
         for i in range(regions_size):
             lables = regions[i].get_label()
             neighbors = regions[i].get_neighbor()
@@ -272,7 +291,7 @@ class MultiSeedsSimilarityCriteria(SimilarityCriteria):
 
             if regions_delta[i][0] < min_value:
                 min_value = regions_delta[i][0]
-                nearest_neighbor_label = i
+                nearest_neighbor_label = i + 1
                 nearest_neighbor_cord = sort_neighbor[i][0]
 
             print 'min_value: ', min_value, '   nearest_neighbor: ', nearest_neighbor_label, \
