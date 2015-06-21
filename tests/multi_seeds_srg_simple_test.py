@@ -5,8 +5,6 @@ import nibabel as nib
 
 from algorithm.region_growing import *
 from algorithm.similarity_criteria import *
-from algorithm.stop_criteria import *
-from algorithm.region import *
 
 if __name__ == "__main__":
     #load data
@@ -23,33 +21,63 @@ if __name__ == "__main__":
     l_pFus_seed_coords = np.array([[65, 42, 26]])
     seed_coords = [r_OFA_seed_coords, l_OFA_seed_coords, r_pFus_seed_coords, l_pFus_seed_coords]
 
+    ssl_cords = []
+    ssl_delta = []
+    boundary = []
+
+    #boundary -1 ,  unlabel 0, label 1...n
+    result_image = np.zeros_like(image)
     neighbor_element = SpatialNeighbor('connected', image.shape, 26)
 
-    r_OFA_region = Region(r_OFA_seed_coords, neighbor_element)
-    l_OFA_region = Region(l_OFA_seed_coords, neighbor_element)
-    r_pFus_region = Region(r_pFus_seed_coords, neighbor_element)
-    l_pFus_region = Region(l_pFus_seed_coords, neighbor_element)
-    regions = [r_OFA_region, l_OFA_region, r_pFus_region, l_pFus_region]
+    for i in range(len(seed_coords)):
+        result_image[seed_coords[i][:, 0], seed_coords[i][:, 1], seed_coords[i][:, 2]] =  i + 1
+        neighbors = neighbor_element.compute(seed_coords[i])
+        mean = image[result_image == i + 1].mean()
+        for j in range(neighbors.shape[0]):
+            ssl_cords.append(neighbors[j, :])
+            neighbor_value = image[tuple(neighbors[j, :])]
+            ssl_delta.append(abs(neighbor_value - mean))
 
-    multi_seeds_similarity_criteria = MultiSeedsSimilarityCriteria('euclidean')
-    for i in range(len(regions)):
-        for neighbor in regions[i].get_neighbor():
-            multi_seeds_similarity_criteria.add_ssl_element(neighbor, i)
+    all_regions_size = 40
+    # while len(ssl_cords) > 0 or (result_image > 0).sum() < all_regions_size:
+    while (result_image > 0).sum() < all_regions_size:
+        min_index = np.array(ssl_delta).argmin()
+        nearest_neighbor_cord = ssl_cords[min_index]
+        print ' nearest_neighbor_cord: ', nearest_neighbor_cord
 
-    stop_criteria = StopCriteria('size')
-    threshold = np.array((1600, ))
+        neighbors = neighbor_element.compute(nearest_neighbor_cord)
+        neighbor_values = result_image[neighbors[:, 0], neighbors[:, 1], neighbors[:, 2]]
 
+        if len(np.unique(neighbor_values)) > 2:
+            boundary.append(nearest_neighbor_cord)
+            result_image[tuple(nearest_neighbor_cord)] = -1 #boundary label value
+        else:
+            new_label = np.unique(neighbor_values)[1] #[0, new label]
+            print ' new_label: ', new_label
+            result_image[tuple(nearest_neighbor_cord)] = new_label
+            #update the corresponding region mean
+            new_region_mean = image[result_image == new_label].mean()
+            print ' new_region_mean: ', new_region_mean
 
-    multi_seeds_srg = MultiSeedsSRG(multi_seeds_similarity_criteria, stop_criteria)
-    srg_region = multi_seeds_srg.compute(regions, image, threshold)
+            for i in range(neighbors.shape[0]):
+                cord = neighbors[i, :]
+                value = result_image[tuple(cord)]
 
+                is_in_ssl_cords = False
+                for element in ssl_cords:
+                    if (cord == element).all():
+                        is_in_ssl_cords = True
+                        break
+                if value == 0 and is_in_ssl_cords:
+                    ssl_cords.append(cord)
+                    new_value = abs(image[tuple(cord)] - new_region_mean)
+                    ssl_delta.append(new_value)
+        del ssl_cords[min_index] #delete neighbor from ssl
+        del ssl_delta[min_index]
 
-    result_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(srg_region)))
-    for i in range(len(srg_region)):
-        labels = srg_region[i].get_label()
-        result_image[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
+        print '-------', (result_image > 0).sum(), '-----', len(boundary), '----', len(ssl_cords), '--------'
 
-    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_srg.nii.gz")
+    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_multi_seeds_srg.nii.gz")
 
     endtime = time.clock()
     print 'Cost time:: ', np.round((endtime - starttime), 3), ' s'
