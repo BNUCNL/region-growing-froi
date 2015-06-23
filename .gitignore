@@ -1,0 +1,8 @@
+
+.idea
+*.pyc
+tests/asrgtest.py
+tests/rsrgtest.py
+tests/slicSRGtest.py
+
+
