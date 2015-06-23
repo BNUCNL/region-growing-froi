@@ -3,7 +3,7 @@ from scipy.spatial import distance
 from algorithm.neighbor import *
 
 
-class SimilarityCriteria:
+class SimilarityCriteria(object):
     """
     The object to compute the similarity between the labeled region and its neighbors
     Attributes
@@ -52,6 +52,81 @@ class SimilarityCriteria:
         Get the neighbor prop for randomization
         """
         return self.rand_neighbor_prop
+
+    def compute_neighbor_distance(self, region, image, nbidx, metric=None):
+        """
+        Compute the distance between the labeled region and its neighbors.
+        Parameters
+        ----------
+        image: numpy 2d/3d/4d array
+            The numpy array to represent 2d/3d/4d image to be segmented.
+        region: class Region
+            represent the current region and associated attributes
+        nbidx: numpy 1d array
+            A array to provide the index which neighbors should be considered
+        metric: str, optional
+            distance metric
+        """
+
+        if metric is None:
+            metric = self.metric
+
+        if metric == 'euclidean':
+            # compute distance for 2d image
+            if image.ndim == 2:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+                dist = np.abs(region_val - neighbor_val)
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+                dist = np.abs(region_val - neighbor_val)
+
+            # compute distance for 4d image
+            else:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2], :])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+
+                dist = distance.cdist(region_val, neighbor_val, 'euclidean')
+
+        elif metric == 'mahalanobis':
+            if image.ndim == 2:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1]])
+                region_std = np.std(image[region.label[:, 0], region.label[:, 1]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+
+                dist = np.abs(region_val - neighbor_val) / region_std
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                region_std = np.std(image[region.label[:, 0], region.label[:, 1], region.label[:, 2]])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+                dist = np.abs(region_val - neighbor_val) / region_std
+
+            # compute distance for 4d image
+            elif image.ndim == 4:
+                region_val = np.mean(image[region.label[:, 0], region.label[:, 1], region.label[:, 2], :])
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2], :]
+                dist = distance.cdist(region_val, neighbor_val, 'mahalanobis')
+
+        elif metric == 'exp':
+            if image.ndim == 2:
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1]]
+                print neighbor_val
+
+            # compute distance for 3d image
+            elif image.ndim == 3:
+                neighbor_val = image[region.neighbor[nbidx, 0], region.neighbor[nbidx, 1], region.neighbor[nbidx, 2]]
+
+            dist = np.exp(-neighbor_val)
+
+        return dist
 
     def compute(self, region, image):
         """
@@ -105,12 +180,12 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         Do computing the similarity between the labeled region and its neighbors
     """
 
-    def __init__(self, prior_image, wei_meth='PB', prior_weight=None, metric='euclidean', rand_neighbor_prop=1):
+    def __init__(self, prior_image, weight_method_name='PB', prior_weight=None, metric='euclidean', rand_neighbor_prop=1):
         """
         Parameters
         prior_image: np array
             the prior image used in the similarity computing
-        wei_meth: str, optional
+        weight_method_name: str, optional
             the weighted method for the prior,supporting probability based(PB) and distance based(DB) method
         prior_weight: double,
             the weight to use the prior
@@ -121,8 +196,8 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         """
         super(PriorBasedSimilarityCriteria, self).__init__(metric, rand_neighbor_prop)
 
-        if wei_meth == 'PB' or wei_meth == 'DB':
-            self.wei_meth = wei_meth
+        if weight_method_name == 'PB' or weight_method_name == 'DB':
+            self.weight_method_name = weight_method_name
         else:
             raise ValueError("The weighted method should be 'PB(probability based)' or 'DB(distance based)'.")
 
@@ -154,17 +229,17 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         return self.prior_weight
 
 
-    def set_wei_meth(self, wei_meth):
+    def set_weight(self, weight_method_name):
         """
         Set weighted method: PB(probability based) or DB(distance based)
         """
-        self.wei_meth = wei_meth
+        self.weight_method_name = weight_method_name
 
-    def get_wei_meth(self):
+    def get_weight(self):
         """
         Get weighted method.
         """
-        return self.wei_meth
+        return self.weight_method_name
 
     def compute(self, region, image):
         """
@@ -191,7 +266,7 @@ class PriorBasedSimilarityCriteria(SimilarityCriteria):
         image_dist = self.compute_neighbor_distance(region, image, nbidx)
 
         #  The distance include data distance and prior distance
-        if 'PB' == self.wei_meth:
+        if 'PB' == self.weight_method_name:
             prior_dist = self.compute_neighbor_distance(region, prior_image, nbidx, 'exp')
             dist = image_dist * prior_dist
         else:

@@ -10,43 +10,43 @@ from algorithm.stop_criteria import *
 from algorithm.region import *
 
 if __name__ == "__main__":
+    starttime = time.clock()
+
     # image to be segmanted
-    image = nib.load("../data/S1/tstat1.nii.gz")
+    image = nib.load("../data/S1/zstat1.nii.gz")
     affine = image.get_affine()
     image = image.get_data()
 
-    # prior image and seed region
+    # load prior image
     prior = nib.load("../data/prior/prob_rFFA.nii.gz")
     prior_image = prior.get_data()
+    # get the prior coords
     seed_coords = np.array(np.nonzero(prior_image >= 0.6)).T
+    #init the SpatialNeighbor object
     neighbor_element = SpatialNeighbor('connected', prior_image.shape, 26)
+    #init the region object
     region = Region(seed_coords, neighbor_element)
 
-    # similarity
+    # init the PriorBasedSimilarityCriteria object
     similarity_criteria = PriorBasedSimilarityCriteria(prior_image, 'DB', 0.5)
+    #int the StopCriteria object
     stop_criteria = StopCriteria('size')
 
-    # region size
+    # init the threshold
     threshold = np.array((15, 30))
-    starttime = time.clock()
 
-    # Test for priorSRG
-    srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
-    srg_region = srg.compute(region, image, threshold)
-    for i in range(len(srg_region)):
-        print i, srg_region[i].label.shape
+    # init the SeededRegionGrowing object
+    prior_srg = SeededRegionGrowing(similarity_criteria, stop_criteria)
+    #compute the regions
+    prior_srg_region = prior_srg.compute(region, image, threshold)
 
-    endtime = time.clock()
-    print(endtime - starttime)
+    #Convert the region to image
+    result_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(prior_srg_region)))
+    for i in range(len(prior_srg_region)):
+        labels = prior_srg_region[i].get_label()
+        result_image[labels[:, 0], labels[:, 1], labels[:, 2], i] = 1
+    
+    #save the result image to disk
+    nib.save(nib.Nifti1Image(result_image, affine), "../data/S1/zstat1_prior_srg.nii.gz")
 
-
-    #print region.shape
-
-    #aggregator = Aggregator('MWA')
-    #srg_image = aggregator.compute(region, image)
-
-
-    #srg_image = np.zeros_like(image, dtype=int)
-    #srg_image[region_label[:, 0], region_label[:, 1], region_label[:, 2]] = 1
-    #nib.save(nib.Nifti1Image(srg_image, affine), "../data/S2/RSRG3d.nii.gz")
 

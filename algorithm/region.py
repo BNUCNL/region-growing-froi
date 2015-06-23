@@ -141,56 +141,64 @@ class Region(object):
 
         self.neighbor = neighbor
 
-    def add_neighbor(self, neighbor):
+    def add_neighbor(self, *args):
         """
         Add the coordinates of new neighbor to the neighbor of region.
-        Parameters
-        neighbor: numpy 2d array
+        """
+        def add_neighbor_basic(self, neighbor):
+            """
+            Add the coordinates of new neighbor to the neighbor of region.
+            Parameters
+            neighbor: numpy 2d array
             Each row represents the coordinates for  a pixels
-        """
-        neighbor = self.neighbor_element.compute(neighbor)
-        # find the neighbor which have been in neighbor or in label list
-        marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
-                               utils.in2d(neighbor, self.label))
-        # delete the marked neighbor
-        neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
-        # Add unmarked neighbor to the region neighbor and update the neighbor size
-        self.neighbor = np.append(self.neighbor, neighbor, axis=0)
+            """
+            neighbor = self.neighbor_element.compute(neighbor)
+            # find the neighbor which have been in neighbor or in label list
+            marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
+                           utils.in2d(neighbor, self.label))
+            # delete the marked neighbor
+            neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
+            # Add unmarked neighbor to the region neighbor and update the neighbor size
+            self.neighbor = np.append(self.neighbor, neighbor, axis=0)
 
-    def add_neighbor(self, neighbor, similarity_criteria, label_num):
-        """
-        Add the coordinates of new neighbor to the neighbor of region.
-        Parameters
-        neighbor: numpy 2d array
-            Each row represents the coordinates for  a pixels
-        SSL: numpy 2d array
-        """
-        neighbor = self.neighbor_element.compute(neighbor)
-        # find the neighbor which have been in neighbor or in label list
-        marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
-                               utils.in2d(neighbor, self.label))
-        # delete the marked neighbor
-        neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
-        # Add unmarked neighbor to the region neighbor and update the neighbor size
-        ssl = similarity_criteria.get_ssl()
-        boundary = similarity_criteria.get_boundary()
-        neighbor_labeled = []
-        neighbor_unlabeled = []
-        for element in neighbor:
-            if element in ssl.keys():
-                neighbor_labeled.append(ssl[element])
-            elif element not in ssl.keys() and element not in boundary:
-                neighbor_unlabeled.append(element)
+        def add_neighbor_slic(self, neighbor, similarity_criteria, label_num):
+            """
+            Add the coordinates of new neighbor to the neighbor of region.
+            Parameters
+            neighbor: numpy 2d array
+                Each row represents the coordinates for  a pixels
+            SSL: numpy 2d array
+            """
+            neighbor = self.neighbor_element.compute(neighbor)
+            # find the neighbor which have been in neighbor or in label list
+            marked = np.logical_or(utils.in2d(neighbor, self.neighbor),
+                                   utils.in2d(neighbor, self.label))
+            # delete the marked neighbor
+            neighbor = np.delete(neighbor, np.nonzero(marked), axis=0)
+            # Add unmarked neighbor to the region neighbor and update the neighbor size
+            ssl = similarity_criteria.get_ssl()
+            boundary = similarity_criteria.get_boundary()
+            neighbor_labeled = []
+            neighbor_unlabeled = []
+            for element in neighbor:
+                if element in ssl.keys():
+                    neighbor_labeled.append(ssl[element])
+                elif element not in ssl.keys() and element not in boundary:
+                    neighbor_unlabeled.append(element)
 
-        neighbor_labeled_values = neighbor_labeled.values()
-        for i in range(len(1, neighbor_labeled_values)):
-            if neighbor_labeled_values[0] != neighbor_labeled_values[i]:
-                similarity_criteria.add_boundary_element(neighbor)
-                return
+            neighbor_labeled_values = neighbor_labeled.values()
+            for i in range(len(1, neighbor_labeled_values)):
+                if neighbor_labeled_values[0] != neighbor_labeled_values[i]:
+                    similarity_criteria.add_boundary_element(neighbor)
+                    return
 
-        for i in range(len(neighbor_unlabeled)):
-            self.neighbor = np.append(self.neighbor, neighbor_unlabeled[i], axis=0)
-            similarity_criteria.add_ssl_element(neighbor_unlabeled[i], label_num)
+            for i in range(len(neighbor_unlabeled)):
+                self.neighbor = np.append(self.neighbor, neighbor_unlabeled[i], axis=0)
+                similarity_criteria.add_ssl_element(neighbor_unlabeled[i], label_num)
+        if len(args) == 1:
+            return add_neighbor_basic(self, *args)
+        else:
+            return add_neighbor_slic(self, *args)
 
 
     def remove_neighbor(self, label):
