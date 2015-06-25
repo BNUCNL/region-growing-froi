@@ -1,23 +1,26 @@
+# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
+# vi: set ft=python sts=4 ts=4 sw=4 et:
+
+"""
+Aggregator for a set of regions.
+
+"""
+
 from algorithm.neighbor import *
 
 
 class Aggregator(object):
     """
     Aggregator for a set of regions.
-    Attributes
-    aggr_type:  str, optional
-        Description for the method to  aggregate the regions. Supported methods include
-        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
-        default is DA.
     """
 
     def __init__(self, agg_type='UWA'):
         """
         Parameters
-        aggr_type:  str, optional
-        Description for the method to  aggregate the regions. Supported methods include
-        'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity  weighted _average'(HWA),
-        default is UWA.
+        aggr_type: str, optional
+            Description for the method to  aggregate the regions. Supported methods include
+            'uniform weighted average'(UWA), 'magnitude weighted average'(MWA), 'homogeneity
+             weighted _average'(HWA), default is UWA.
         """
         if agg_type == 'UWA' or agg_type == 'MWA' or agg_type == 'HWA':
             self.agg_type = agg_type
@@ -49,8 +52,6 @@ class Aggregator(object):
 
                     weight = weight / weight.sum()
                     agg_image[:, :, i] = np.average(region_image, axis=2, weights=weight)
-                    region_image[:] = 0
-
             elif self.agg_type == 'MWA':
                 for i in range(len(region)):
                     for j in range(len(region[0])):
@@ -60,8 +61,6 @@ class Aggregator(object):
 
                     weight = weight / weight.sum()
                     agg_image[:, :, i] = np.average(region_image, axis=2, weights=weight)
-                    region_image[:] = 0
-
             elif self.agg_type == 'HWA':
                 for i in range(len(region)):
                     for j in range(len(region[0])):
@@ -71,8 +70,6 @@ class Aggregator(object):
 
                     weight = weight / weight.sum()
                     agg_image[:, :, i] = np.average(region_image, axis=2, weights=weight)
-                    region_image[:] = 0
-
         elif image.ndim == 3:
             agg_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region[0])), dtype=float)
             region_image = np.zeros((image.shape[0], image.shape[1], image.shape[2], len(region)), dtype=np.int32)
@@ -86,8 +83,6 @@ class Aggregator(object):
 
                     weight = weight / weight.sum()
                     agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
-                    region_image[:] = 0
-
             elif self.agg_type == 'MWA':
                 for i in range(len(region[0])):
                     for j in range(len(region)):
@@ -95,19 +90,10 @@ class Aggregator(object):
                         region_image[label[:, 0], label[:, 1], label[:, 2], j] = 1
                         weight[j] = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
 
-                    # print weight.max() - weight.min()
-                    # min = weight.min()
-                    # if min < 0:
-                    #     weight += np.abs(min)
-                    # weight = weight / weight.sum()
-
-                    # weight = np.arctan(weight) * 2 / 3.1415926
                     if weight.min() < 0:
                         weight += np.abs(weight.min())
                     weight = weight / weight.sum()
                     agg_image[..., i] = np.average(region_image, axis=3, weights=weight)
-                    # region_image[:] = 0
-
             elif self.agg_type == 'HWA':
                 for i in range(len(region[0])):
                     for j in range(len(region)):
@@ -119,8 +105,6 @@ class Aggregator(object):
                         weight = weight + np.abs(weight.min())
                     weight = weight / weight.sum()
                     agg_image[:, :, :, i] = np.average(region_image, axis=3, weights=weight)
-                    region_image[:] = 0
-
         elif image.ndim == 4:
             pass
 

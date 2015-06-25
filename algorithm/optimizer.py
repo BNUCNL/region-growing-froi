@@ -1,3 +1,10 @@
+# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
+# vi: set ft=python sts=4 ts=4 sw=4 et:
+
+"""
+Optimizer to select the optimal segmentation from a set of region growing results.
+
+"""
 
 from algorithm.neighbor import *
 
@@ -9,8 +16,8 @@ class Optimizer(object):
         Description for the criteria to select the optimal segmentation from region growing. methods include
         'peripheral contrast'(PC), 'average contrast'(AC), 'homogeneity  weighted _average'(HWA),
         default is PC.
-    """
 
+    """
     def __init__(self, opt_type):
         """
         Parameters
@@ -19,10 +26,10 @@ class Optimizer(object):
             'peripheral contrast'(PC), 'average contrast'(AC), 'homogeneity  weighted _average'(HWA),
             default is PC.
         """
-        # if opt_type == 'PC' or opt_type == 'AC':
-        #     self.opt_type = opt_type
-        # else:
-        #     raise ValueError("The Type of aggregator should be 'PC' and 'AC'.")
+        if opt_type == 'PC' or opt_type == 'AC':
+            self.opt_type = opt_type
+        else:
+            raise ValueError("The Type of aggregator should be 'PC' and 'AC'.")
         self.opt_type = opt_type
 
     def compute(self, region, image):
@@ -35,7 +42,7 @@ class Optimizer(object):
             image to be  segmented.
         Returns
         con_val: optimizing index
-          A index to measure the performance of the segmentation
+            A index to measure the performance of the segmentation
         """
         con_val = np.zeros((len(region), len(region[0])))
         if image.ndim == 2:
@@ -47,7 +54,6 @@ class Optimizer(object):
                         bound_val = np.mean(image[bound[:, 0], bound[:, 1]])
                         per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1]])
                         con_val[i, j] = (bound_val - per_val) / (bound_val + per_val)
-
             elif self.opt_type == 'AC':
                 for i in range(len(region)):
                     for j in range(len(region[0])):
@@ -56,7 +62,6 @@ class Optimizer(object):
                         region_val = np.mean(image[label[:, 0], label[:, 1]])
                         per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1]])
                         con_val[i, j] = (region_val - per_val) / (region_val + per_val)
-
         elif image.ndim == 3:
             if self.opt_type == 'PC':
                 for i in range(len(region)):
@@ -69,7 +74,6 @@ class Optimizer(object):
                             con_val[i, j] = 0
                         else:
                             con_val[i, j] = (bound_val - per_val) / (bound_val + per_val)
-
             elif self.opt_type == 'AC':
                 for i in range(len(region)):
                     for j in range(len(region[0])):
@@ -78,8 +82,8 @@ class Optimizer(object):
                         region_val = np.mean(image[label[:, 0], label[:, 1], label[:, 2]])
                         per_val = np.mean(image[neighbor[:, 0], neighbor[:, 1], neighbor[:, 2]])
                         con_val[i, j] = (region_val - per_val)
-
         elif image.ndim == 4:
             pass
         con_val = con_val / con_val.max()
+
         return con_val
