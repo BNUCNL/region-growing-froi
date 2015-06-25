@@ -6,8 +6,7 @@ SpatialNeighbor Generator for a set of refer points(pixels or voxels).
 
 """
 import numpy as np
-
-from utils import utils
+from algorithm import utils
 
 
 class SpatialNeighbor(object):
