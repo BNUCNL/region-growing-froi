@@ -1,3 +1,10 @@
+# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
+# vi: set ft=python sts=4 ts=4 sw=4 et:
+
+"""
+Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeded region.
+
+"""
 
 import copy
 import numpy as np

@@ -2,7 +2,7 @@
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 
 """
-Neighbor Generator for a set of refer points(pixels or voxels).
+SpatialNeighbor Generator for a set of refer points(pixels or voxels).
 
 """
 import numpy as np
@@ -83,7 +83,6 @@ class SpatialNeighbor(object):
                                [0, -1, 1], [1, -1, 1], [-1, 0, 1],
                                [0, 0, 1], [1, 0, 1], [-1, 1, 1],
                                [0, 1, 1], [1, 1, 1]]
-
         elif neighbor_type == 'sphere':
             if len(self.image_shape) == 2:
                 for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
@@ -97,7 +96,6 @@ class SpatialNeighbor(object):
                         for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
                             if np.linalg.norm([x, y, z]) <= self.neighbor_size:
                                 offsets.append([x, y, z])
-
         elif neighbor_type == 'cube':
             if len(self.image_shape) == 2:
                 for x in np.arange(-self.neighbor_size, self.neighbor_size + 1):
@@ -109,24 +107,20 @@ class SpatialNeighbor(object):
                     for y in np.arange(-self.neighbor_size, self.neighbor_size + 1):
                         for z in np.arange(-self.neighbor_size, self.neighbor_size + 1):
                             offsets.append([x, y, z])
-
         else:
             raise ValueError("The Neighbor Type should be 'connected', 'sphere', and 'cube'.")
 
         self.offsets = np.array(offsets)
 
-
     def compute(self, refs):
         """
         compute the neighbor for a region(i.e., a set of pixes or voxels)
-
         Parameters
         ----------
         refs: list, tuple or numpy 2d array
             Each row represents the coordinates for a ref point
 
         """
-
         if not isinstance(refs, np.ndarray):
             refs = np.array(refs)
         if len(refs.shape) != 2:
@@ -135,7 +129,6 @@ class SpatialNeighbor(object):
         coords = np.zeros((self.offsets.shape[0] * refs.shape[0], refs.shape[1]), dtype=int)
         for r in range(refs.shape[0]):
             coords[r * self.offsets.shape[0]:(r + 1) * self.offsets.shape[0], :] = refs[r, :] + self.offsets
-
         coords = coords[is_in_image(coords, self.image_shape), :]
 
         return utils.unique2d(coords)
@@ -160,11 +153,6 @@ def is_in_image(coords, image_shape):
         return np.all([coords[:, 0] >= 0, coords[:, 0] < image_shape[0],
                        coords[:, 1] >= 0, coords[:, 1] < image_shape[1],
                        coords[:, 2] >= 0, coords[:, 2] < image_shape[2]], axis=0)
-
-
-if __name__ == "__main__":
-    nb = SpatialNeighbor('connected', (20, 20, 20), 26)
-    print nb.compute([(20, 15, 15), (18, 16, 15)]).shape
 
 
 
