@@ -6,7 +6,7 @@ Aggregator for a set of regions.
 
 """
 
-from algorithm.neighbor import *
+from algorithm.unsed.neighbor import *
 
 
 class Aggregator(object):

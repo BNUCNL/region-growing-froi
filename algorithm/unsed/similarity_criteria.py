@@ -7,7 +7,7 @@ The object to compute the similarity between the labeled region and its neighbor
 """
 
 from scipy.spatial import distance
-from algorithm.neighbor import *
+from algorithm.unsed.neighbor import *
 
 
 class SimilarityCriteria(object):

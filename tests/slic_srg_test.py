@@ -4,11 +4,11 @@
 import time
 import nibabel as nib
 
-from algorithm.region_growing import *
-from algorithm.similarity_criteria import *
-from algorithm.stop_criteria import *
-from algorithm.region import *
-from algorithm.optimizer import *
+from algorithm.unsed.region_growing import *
+from algorithm.unsed.similarity_criteria import *
+from algorithm.unsed.stop_criteria import *
+from algorithm.unsed.region import *
+from algorithm.unsed.optimizer import *
 
 if __name__ == "__main__":
     starttime = time.clock()
