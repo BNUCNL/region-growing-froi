@@ -21,17 +21,20 @@ class Region(object):
     def add_region(self, region):
         self.region_values |= region.get_region_value()
 
-    def remove_region(self, region_value):
-        self.region_values.remove(region_value)
+    def remove_region(self, region):
+        self.region_values ^= region.get_region_value()
 
     def get_region_value(self):
-        self.region_values
+        return self.region_values
 
-    def add_neighbor_region(self, neighbor_value):
-        self.neighbor_values.add(neighbor_value)
+    def add_neighbor_region(self, neighbor_region):
+        self.neighbor_values |= neighbor_region.get_neighbor_region_value()
 
-    def remove_neighbor_region(self, neighbor_value):
-        self.neighbor_values.remove(neighbor_value)
+    def remove_neighbor_region(self, neighbor_region):
+        self.neighbor_values ^= neighbor_region.get_neighbor_region_value()
+
+    def get_neighbor_region_value(self):
+        return self.neighbor_values
 
     def get_region_mean(self):
         mask = self.generate_region_mask()
@@ -42,12 +45,13 @@ class Region(object):
 
     def get_region_size(self):
         mask = self.generate_region_mask()
-
         return mask.sum()
+
+    def get_neighbor_values_size(self):
+        return self.neighbor_values.__len__()
 
     def get_neighbor_size(self):
         mask = self.generate_region_neighbor_mask()
-
         return mask.sum()
 
     def generate_region_mask(self):
