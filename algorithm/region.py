@@ -6,6 +6,7 @@ An object to represent the region and its associated attributes
 
 """
 import numpy as np
+import sys
 
 class Region(object):
     def __init__(self, value, image, unique_image):
@@ -14,12 +15,16 @@ class Region(object):
         self.region_values = set()
         self.region_values.add(value)
         self.neighbor_values = set()
+        self.is_changed = True
+        self.mean = sys.maxint
 
     def add_region(self, region):
         self.region_values |= region.get_region_value()
+        self.is_changed = True
 
     def remove_region(self, region):
         self.region_values ^= region.get_region_value()
+        self.is_changed = True
 
     def get_region_value(self):
         return self.region_values
@@ -35,9 +40,10 @@ class Region(object):
         return self.neighbor_values
 
     def get_region_mean(self):
-        mask = self.generate_region_mask()
-        self.mean = self.image[mask].mean()
-
+        if self.is_changed:
+            mask = self.generate_region_mask()
+            self.mean = self.image[mask].mean()
+            self.is_changed = False
         return self.mean
 
     def get_region_values_size(self):

@@ -1,13 +1,13 @@
 # emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 
+import time
+import nibabel as nib
+import numpy as np
+
 from algorithm.region_growing import SeededRegionGrowing
 
 if __name__ == "__main__":
-    import time
-    import nibabel as nib
-    import numpy as np
-
     starttime = time.clock()
     #load data
     image = nib.load("../data/S1/zstat1.nii.gz")
@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     # init r_FFA seed point: [25, 41, 25]
     seed_coords = np.array([[25, 41, 25]])
-    srg_object = SeededRegionGrowing(seed_coords, 50)
+    srg_object = SeededRegionGrowing(seed_coords, 500)
     # srg_object.convert_image_to_regions(image, brain_mask)
 
     r_FFA_mask = nib.load("../data/prior/prob_rFFA.nii.gz").get_data().astype(np.bool)

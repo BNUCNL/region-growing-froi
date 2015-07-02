@@ -6,6 +6,7 @@ Seeded region growing performs a segmentation of an image with respect to a set 
 
 """
 import copy
+import time
 import numpy as np
 
 from region import Region
@@ -35,14 +36,19 @@ class SeededRegionGrowing(object):
         return value_region_dicts, unique_image
 
     def compute_nearest_region(self, result_region, value_region_dicts):
+
         result_region.compute_neighbor_regions()
         neighbor_region_values = list(result_region.get_neighbor_region_value())
 
+        starttime = time.clock()
         print 'result_region.get_region_mean(): ', result_region.get_region_mean()
         theta = np.zeros((len(neighbor_region_values), ))
+        current_region_mean = result_region.get_region_mean()
         for i in range(len(neighbor_region_values)):
-            theta[i] = abs(value_region_dicts[neighbor_region_values[i]].get_region_mean()
-                           - result_region.get_region_mean())
+            theta[i] = abs(value_region_dicts[neighbor_region_values[i]].get_region_mean() - current_region_mean)
+        compute_neighbor_time = time.clock()
+        print 'compute_neighbor_time: ', (compute_neighbor_time - starttime)
+
         nearest_neighbor_region_index = theta.argmin()
         print 'nearest_neighbor_region_index: ', nearest_neighbor_region_index, '   theta.min: ', theta.min()
         nearest_region = value_region_dicts[neighbor_region_values[nearest_neighbor_region_index]]
@@ -59,14 +65,19 @@ class SeededRegionGrowing(object):
         result_region = Region(seed_value[0], image, unique_image)
         while region_size < self.stop_size:
             #compute the nearest region
+            starttime = time.clock()
             nearest_region = self.compute_nearest_region(result_region, value_region_dicts)
+            nearest_time = time.clock()
             #update the result_region
             result_region.remove_neighbor_region(nearest_region)
             result_region.add_region(nearest_region)
             result_region.add_neighbor_region(nearest_region)
+            add_neighbor_time = time.clock()
             #compute the stop condition
             region_size = result_region.get_region_size()
             print 'region_size: ', region_size
+            print 'nearest_time: ', (nearest_time - starttime)
+            print '----------------------------------------------------------------'
 
         return result_region
 
