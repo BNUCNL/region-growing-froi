@@ -6,7 +6,7 @@ Optimizer to select the optimal segmentation from a set of region growing result
 
 """
 
-from algorithm.neighbor import *
+from algorithm.unsed.neighbor import *
 
 class Optimizer(object):
     """
