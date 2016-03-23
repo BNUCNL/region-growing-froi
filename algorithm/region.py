@@ -6,99 +6,162 @@ An object to represent the region and its associated attributes
 
 """
 import numpy as np
-import sys
+
 
 class Region(object):
-    def __init__(self, value, image, unique_image):
-        self.image = image
-        self.unique_image = unique_image
-        self.region_values = set()
-        self.region_values.add(value)
-        self.neighbor_values = set()
-        self.is_changed = True
-        self.mean = sys.maxint
+    def __init__(self, position, value, r_id, neighbor):
+        """
 
-    def add_region(self, region):
-        self.region_values |= region.get_region_value()
-        self.is_changed = True
+        Parameters
+        ----------
+        position: coordinates array, n_voxel x 3 np.array
+        value : value array, n_voxel x n_feature np.array
+        id_: region id, a unique scalar
+        neighbor: neighbor id array(n_neighbor, )
 
-    def remove_region(self, region):
-        self.region_values ^= region.get_region_value()
-        self.is_changed = True
+        Returns
+        -------
 
-    def get_region_value(self):
-        return self.region_values
+        """
+        self.position = position
+        self.value = value
+        self.id = r_id
+        self.component = r_id
+        self.neighbor = neighbor
+        self.sum = np.mean(self.value)
 
-    def add_neighbor_region(self, neighbor_region):
-        self.neighbor_values |= neighbor_region.get_neighbor_region_value()
-        self.neighbor_values -= self.region_values
+    def add(self, region):
+        if not np.any(self.component == region.id):
+            self.position = np.append(self.position, region.position)
+            self.value = np.append(self.value, region.value)
+            self.sum = np.mean(self.value)
+            self.component = np.append(self.component, region.id)
 
-    def remove_neighbor_region(self, neighbor_region):
-        self.neighbor_values -= neighbor_region.get_region_value()
+    def value(self):
+        return self.sum
 
-    def get_neighbor_region_value(self):
-        return self.neighbor_values
+    def add_neighbor(self, region):
+        if not np.any(self.neighbor == region.id):
+            self.neighbor = np.append(self.neighbor, region.id)
 
-    def get_region_mean(self):
-        if self.is_changed:
-            mask = self.generate_region_mask()
-            self.mean = self.image[mask].mean()
-            self.is_changed = False
-        return self.mean
+    def remove_neighbor(self, region):
+        self.neighbor = self.neighbor[self.neighbor != region.id]
 
-    def get_region_values_size(self):
-        return self.region_values.__len__()
+    def size(self):
+        return self.value.shape[0]
 
-    def get_region_size(self):
-        mask = self.generate_region_mask()
-        return mask.sum()
+    def neighbor_size(self):
+        return self.neighbor.shape[0]
 
-    def get_neighbor_values_size(self):
-        return self.neighbor_values.__len__()
+    def nearest_neighbor(self):
+        pass
 
-    def get_neighbor_size(self):
-        mask = self.generate_region_neighbor_mask()
-        return mask.sum()
 
-    def generate_region_mask(self):
-        region_mask = np.zeros_like(self.unique_image).astype(np.bool)
-        for region_value in self.region_values:
-            region_mask[self.unique_image == region_value] = True
+class RepresentImageToRegion(object):
 
-        return region_mask
+    """
 
-    def generate_region_neighbor_mask(self):
-        neighbor_mask = np.zeros_like(self.unique_image).astype(np.bool)
-        for neighbor_value in self.neighbor_values:
-            neighbor_mask[self.unique_image == neighbor_value] = True
+    Parameters
+    ----------
+    image: image array
+    meth: original or divided
+    mask: mask to indicate the spatial extent to be represented
 
-        return neighbor_mask
+    Returns
+    -------
+    regions: a list of Region object
 
-    def get_region_cords(self):
-        dimension = len(self.image.shape)
-        region_mask = self.generate_region_mask()
-        region_cords = np.nonezeros(region_mask).reshape((dimension, -1))
+    """
+    def __init__(self, meth='slic'):
+        self.meth = meth
 
-        return region_cords
+    def compute(self, image, n_region, mask=None):
 
-    def get_neighbor_region_cords(self):
-        dimension = len(self.image.shape)
-        neighbor_region_mask = self.generate_region_neighbor_mask()
-        neighbor_region_cords = np.nonezeros(neighbor_region_mask).reshape((dimension, -1))
+        from skimage import segmentation, filter
+        from skimage.future import graph
 
-        return neighbor_region_cords
+        gray_image = image.copy()
+        if mask is not None:
+            gray_image[mask > 0] = 0
 
-    def compute_neighbor_regions(self):
-        from scipy.ndimage.morphology import binary_dilation
+        # Convert the original image to the 0~255 gray image
+        gray_image = (gray_image - gray_image.min()) * 255 / (gray_image.max() - gray_image.min())
+        labels = segmentation.slic(gray_image.astype(np.float),
+                                   n_segments=n_region,
+                                   slic_zero=True, sigma=2,
+                                   multichannel=False,
+                                   enforce_connectivity=True)
+        edge_map = filter.sobel(gray_image)
+        rag = graph.rag_boundary(labels, edge_map)
+        rag = rag > 0
 
-        region_mask = self.generate_region_mask()
-        #compute new neighbors
-        neighbor_mask = binary_dilation(region_mask)
-        neighbor_mask[region_mask] = 0
-        neighbor_values = np.unique(self.unique_image[neighbor_mask > 0])
-        neighbor_values = np.delete(neighbor_values, 0)
-        #Add new neighbor values
-        self.neighbor_values |= set(neighbor_values.tolist())
+        regions = []
+        for r in np.arange(rag.shape[0]):
+            position = np.nonzero(labels == r)
+            regions.append(Region(position, value=None, id_=None, neighbor=None))
+
+        return regions
+
+class SeededRegionGrowing(object):
+    """
+    Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeded region.
+    Attributes
+    similarity_criteria: SimilarityCriteria object
+        The similarity criteria which control the neighbor to merge to the region
+    stop_criteria: StopCriteria object
+        The stop criteria which control when the region growing stop
+    Methods
+    compute(region,image)
+        do region growing
+    """
+    def __int__(self, similarity_measure, stop_criteria):
+        self.similarity_measure = similarity_measure
+        self.stop_criteria = stop_criteria
+
+    def compute(self, seed_region, candidate_region):
+        """
+
+        Parameters
+        ----------
+        seed_region: region list for seeds
+        candidate_region: region list for candidate region
+
+        Returns
+        -------
+
+        """
+
+        n_seed = len(seed_region)
+        region_size = np.zeros(n_seed)
+        for r in np.arange(n_seed):
+            region_size[r] = seed_region[r].size()
+
+        dist = np.zeros(n_seed)
+        neighbor =  np.zeros(n_seed)
+
+        while np.any(np.less(region_size < self.stop_criteria)):
+            r_index = np.less(region_size < self.stop_criteria)
+
+            dist[r_index] = np.inf
+            for r in np.count_nonzero(r_index):
+                # find the nearest neighbor for the each seed region
+                r_dist, r_neighbor = seed_region[r].nearest_neighbir()
+                dist[r] = r_dist
+                neighbor[r] = r_neighbor
+
+            # select target regions
+            r_id = np.argmin(dist)
+
+            # update seed
+            seed_region[r_id].add(neighbor[r_id])
+
+            # update other seed region's neighbor
+            for r in np.count_nonzero(r_index):
+                seed_region[r].remove_neghbor(neighbor[r])
+
+        return seed_region
+
+
 
 
 
