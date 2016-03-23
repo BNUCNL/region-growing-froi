@@ -17,13 +17,7 @@ class Region(object):
         vox_pos: coordinates array, n_voxel x 3 np.array
         vox_feat : feature array, n_voxel x n_feature np.array
         r_id_: region id, a unique scalar
-
-
-        component_id: component id 1d np.array
-
         neighbor: neighbor region list
-        neighbor_id: neighbor id 1d np.array(n_neighbor, )
-
 
         Returns
         -------
@@ -92,9 +86,32 @@ class RepresentImageToRegion(object):
 
     """
     def __init__(self, meth='slic'):
+        """
+
+        Parameters
+        ----------
+        meth : method to be used to segment the image
+
+        Returns
+        -------
+
+        """
         self.meth = meth
 
     def compute(self, image, n_region, mask=None):
+        """
+
+        Parameters
+        ----------
+        image: image array to be represented
+        n_region : number of region to be generate
+        mask: mask image to give region of interest
+
+        Returns
+        -------
+        regions : a list of region
+
+        """
 
         from skimage import segmentation, filter
         from skimage.future import graph
@@ -135,6 +152,17 @@ class SeededRegionGrowing(object):
         do region growing
     """
     def __int__(self, similarity_measure, stop_criteria):
+        """
+
+        Parameters
+        ----------
+        similarity_measure
+        stop_criteria
+
+        Returns
+        -------
+
+        """
         self.similarity_measure = similarity_measure
         self.stop_criteria = stop_criteria
 
@@ -143,8 +171,7 @@ class SeededRegionGrowing(object):
 
         Parameters
         ----------
-        seed_region: region list for seeds
-        candidate_region: region list for candidate region
+        seed_region: a list for seed regions
 
         Returns
         -------
