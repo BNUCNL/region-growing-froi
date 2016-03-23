@@ -9,52 +9,71 @@ import numpy as np
 
 
 class Region(object):
-    def __init__(self, position, value, r_id, neighbor):
+    def __init__(self, vox_pos, vox_feat, r_id, neighbor):
         """
 
         Parameters
         ----------
-        position: coordinates array, n_voxel x 3 np.array
-        value : value array, n_voxel x n_feature np.array
-        id_: region id, a unique scalar
-        neighbor: neighbor id array(n_neighbor, )
+        vox_pos: coordinates array, n_voxel x 3 np.array
+        vox_feat : feature array, n_voxel x n_feature np.array
+        r_id_: region id, a unique scalar
+
+
+        component_id: component id 1d np.array
+
+        neighbor: neighbor region list
+        neighbor_id: neighbor id 1d np.array(n_neighbor, )
+
 
         Returns
         -------
 
         """
-        self.position = position
-        self.value = value
+        self.vox_pos = vox_pos
+        self.vox_feat = vox_feat
         self.id = r_id
-        self.component = r_id
+        self.feat = np.mean(vox_feat)
+
+        # component regions list
+        self.component = []
+        self.component.append(self)
+
+        # neighbor region list
         self.neighbor = neighbor
-        self.sum = np.mean(self.value)
 
-    def add(self, region):
-        if not np.any(self.component == region.id):
-            self.position = np.append(self.position, region.position)
-            self.value = np.append(self.value, region.value)
-            self.sum = np.mean(self.value)
-            self.component = np.append(self.component, region.id)
+    def merge(self, region):
+        # merge pos and feat
+        self.vox_pos = np.append(self.vox_pos, region.vox_pos)
+        self.vox_feat = np.append(self.vox_feat, region.vox_feat)
 
-    def value(self):
-        return self.sum
+        # add region to the component
+        self.component.append(region)
+
+        # add region's neighbor to the seed's neighbor
+        for i in range(len(region.neighbor)):
+            self.add_neighbor(region.neighbor[i])
 
     def add_neighbor(self, region):
-        if not np.any(self.neighbor == region.id):
-            self.neighbor = np.append(self.neighbor, region.id)
+        if region not in self.component and region not in self.neighbor:
+            self.neighbor.append(region)
 
     def remove_neighbor(self, region):
-        self.neighbor = self.neighbor[self.neighbor != region.id]
+        if region in self.neighbor:
+            self.neighbor.remove(region)
 
     def size(self):
-        return self.value.shape[0]
+        return self.vox_pos.shape[0]
 
-    def neighbor_size(self):
-        return self.neighbor.shape[0]
+    def sum_feat(self):
+        self.feat = np.mean(self.vox_feat)
+        return self.feat
 
     def nearest_neighbor(self):
-        pass
+        feat = [region.sum_feat() for region in self.neighbor]
+        dist = np.absolute(np.array(feat) - self.sum_feat())
+        index = np.argmin(dist)
+
+        return self.neighbor[index], dist[index]
 
 
 class RepresentImageToRegion(object):
@@ -102,6 +121,7 @@ class RepresentImageToRegion(object):
 
         return regions
 
+
 class SeededRegionGrowing(object):
     """
     Seeded region growing performs a segmentation of an image with respect to a set of points, known as seeded region.
@@ -118,7 +138,7 @@ class SeededRegionGrowing(object):
         self.similarity_measure = similarity_measure
         self.stop_criteria = stop_criteria
 
-    def compute(self, seed_region, candidate_region):
+    def compute(self, seed_region):
         """
 
         Parameters
@@ -133,31 +153,32 @@ class SeededRegionGrowing(object):
 
         n_seed = len(seed_region)
         region_size = np.zeros(n_seed)
-        for r in np.arange(n_seed):
+        for r in range(n_seed):
             region_size[r] = seed_region[r].size()
 
-        dist = np.zeros(n_seed)
-        neighbor =  np.zeros(n_seed)
-
+        dist = np.empty(n_seed)
+        dist.fill(np.inf)
         while np.any(np.less(region_size < self.stop_criteria)):
-            r_index = np.less(region_size < self.stop_criteria)
+            r_to_grow = np.less(region_size < self.stop_criteria)
+            dist[np.logical_not(r_to_grow)] = np.inf
+            neighbor = []
+            r_index = np.nonzero(r_to_grow)[0]
 
-            dist[r_index] = np.inf
-            for r in np.count_nonzero(r_index):
+            for i in np.arange(r_index.shape[0]):
                 # find the nearest neighbor for the each seed region
-                r_dist, r_neighbor = seed_region[r].nearest_neighbir()
-                dist[r] = r_dist
-                neighbor[r] = r_neighbor
+                r_neighbor, r_dist, = seed_region[r_index[i]].nearest_neighbor()
+                dist[i] = r_dist
+                neighbor.append(r_neighbor)
 
-            # select target regions
-            r_id = np.argmin(dist)
+            # find the seed which has min neighbor in this iteration
+            r = np.argmin(dist)
 
-            # update seed
-            seed_region[r_id].add(neighbor[r_id])
+            # merge the neighbor to the seed
+            seed_region[r_index[r]].merge(neighbor[r])
 
-            # update other seed region's neighbor
-            for r in np.count_nonzero(r_index):
-                seed_region[r].remove_neghbor(neighbor[r])
+            # remove the neighbor from the neighbor list of all seeds
+            for i in r_index:
+                seed_region[i].remove_neghbor(neighbor[r])
 
         return seed_region
 
