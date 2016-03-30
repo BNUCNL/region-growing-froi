@@ -114,7 +114,7 @@ class RepresentImageToRegion(object):
             gray_image[mask > 0] = 0
 
         # Convert the original image to the 0~255 gray image
-        gray_image = (gray_image - gray_image.min()) * 255 / (gray_image.max() - gray_image.min())
+        gray_image = (gray_image - gray_image.min()) / (gray_image.max() - gray_image.min())
         labels = segmentation.slic(gray_image.astype(np.float),
                                    n_segments=n_region,
                                    slic_zero=True, sigma=2,
@@ -308,9 +308,9 @@ class SeededRegionGrowing(object):
             for i in range(region.vox_pos.shape[0]):
                 coord = region.vox_pos[i]
                 if n_D == 2:
-                    img[coord[0], coord[1]] = region.vox_feat[i][0]
+                    img[coord[0], coord[1]] = region.id
                 elif n_D == 3:
-                    img[coord[0], coord[1], coord[2]] = region.vox_feat[i][0]
+                    img[coord[0], coord[1], coord[2]] = region.id
                 else:
                     raise RuntimeError("We just consider 2_D and 3_D images at present!")
 
@@ -318,26 +318,26 @@ class SeededRegionGrowing(object):
 
 if __name__ == "__main__":
 
-    from skimage import data
-    import matplotlib.pyplot as plt
-    from skimage.color import rgb2gray
+    import nibabel as nib
 
-    image = rgb2gray(data.hubble_deep_field()[0:500, 0:500])
+    temp_file = nib.load("region-growing-froi/data/S1/zstat1.nii.gz")
+    image = temp_file.get_data()
+    affine = temp_file.get_affine()
 
     ritr = RepresentImageToRegion()
-    regions = ritr.compute(image, 1000)
-    img = ritr.regions2image()
+    regions = ritr.compute(image, 200000)
+
+    region_img = ritr.regions2image()
     label_img = ritr.regions2labels()
 
-    seed_region = [regions[100], regions[800]]
-    srg = SeededRegionGrowing(5000)
-    srg.compute(seed_region)
+    seed_region = [regions[31292], regions[33547], regions[42103]]
+    srg = SeededRegionGrowing(500)
+    srg_region = srg.compute(seed_region)
     srg_img = srg.region2image(ritr.image_shape)
 
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex=True, sharey=True)
-    ax1.imshow(image)
-    ax2.imshow(img)
-    ax3.imshow(label_img)
-    ax4.imshow(srg_img)
-
-    plt.show()
+    region_img = nib.Nifti1Image(region_img, affine)
+    label_img = nib.Nifti1Image(label_img, affine)
+    srg_img = nib.Nifti1Image(srg_img, affine)
+    nib.save(region_img, "region_img_zstat1.nii")
+    nib.save(label_img, "label_img_zstat1.nii")
+    nib.save(srg_img, "srg_img_zstat1.nii")
