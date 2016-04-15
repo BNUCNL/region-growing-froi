@@ -288,9 +288,6 @@ class SeededRegionGrowing(object):
         # call methods of the class
         self._compute()
 
-    def set_seed(self, x, y):
-        pass
-
     def _compute(self):
         """
         do region growing
@@ -313,11 +310,11 @@ class SeededRegionGrowing(object):
 
             r_index = np.nonzero(r_to_grow)[0]
 
-            for i in np.arange(r_index.shape[0]):
+            for i in r_index:
                 # find the nearest neighbor for the each seed region
-                r_neighbor, r_dist, = self.seed_region[r_index[i]].nearest_neighbor()
-                dist[r_index[i]] = r_dist
-                neighbor[r_index[i]] = r_neighbor
+                r_neighbor, r_dist, = self.seed_region[i].nearest_neighbor()
+                dist[i] = r_dist
+                neighbor[i] = r_neighbor
 
             # find the seed which has min neighbor in this iteration
             r = np.argmin(dist)
@@ -325,12 +322,16 @@ class SeededRegionGrowing(object):
             # merge the neighbor to the seed
             self.seed_region[r].merge(neighbor[r])
 
-            # update region_size
-            region_size[r] = region_size[r] + neighbor[r].size()
-
             # remove the neighbor from the neighbor list of all seeds
             for i in r_index:
                 self.seed_region[i].remove_neighbor(neighbor[r])
+
+            # update region_size
+            if not self.seed_region[r].neighbor:
+                # If the seed has no neighbor, stop its growing.
+                region_size[r] = np.inf
+            else:
+                region_size[r] = region_size[r] + neighbor[r].size()
 
     def region2text(self):
         """
