@@ -1,6 +1,5 @@
 from ..core.dataobject import Hemisphere
 import numpy as np
-import time
 
 
 class Region(object):
@@ -148,7 +147,7 @@ class Region(object):
 
 class SurfaceToRegions(object):
 
-    def __init__(self, hemisphere):
+    def __init__(self, hemisphere, mask=None):
         """
         represent the surface to preliminary regions
 
@@ -156,6 +155,8 @@ class SurfaceToRegions(object):
         ----------
         hemisphere: Hemisphere
             a instance of the class Hemisphere
+        mask: scalar_data
+            specify a area where the ROI is in.
 
         Returns
         -------
@@ -171,32 +172,58 @@ class SurfaceToRegions(object):
         # just temporarily use the field to find suitable seed_region
         # self.scalar = scalars.values()[0]
 
+        if mask is not None:
+            id_iter = np.nonzero(mask)[0]
+        else:
+            id_iter = range(len(geo.x))
+
         self.regions = []
-        for r_id in range(len(geo.x)):
+        self.v_id2r_id = dict()
+        if mask is None:
+            for v_id in id_iter:
 
-            vtx_feat = dict()
-            vtx_feat[r_id] = np.zeros(len(scalars))
-            for i, key in enumerate(hemisphere.scalar_order):
-                vtx_feat[r_id][i] = scalars[key].scalar_data[r_id]
+                vtx_feat = dict()
+                vtx_feat[v_id] = np.zeros(len(scalars))
+                for i, key in enumerate(hemisphere.scalar_order):
+                    vtx_feat[v_id][i] = scalars[key].scalar_data[v_id]
 
-            self.regions.append(Region(r_id, vtx_feat))
+                self.regions.append(Region(v_id, vtx_feat))
+        else:
+            for r_id, v_id in enumerate(id_iter):
+
+                vtx_feat = dict()
+                vtx_feat[v_id] = np.zeros(len(scalars))
+                for i, key in enumerate(hemisphere.scalar_order):
+                    vtx_feat[v_id][i] = scalars[key].scalar_data[v_id]
+
+                self.regions.append(Region(v_id, vtx_feat))
+                self.v_id2r_id[v_id] = r_id
 
         # find neighbors' id for each region
         # list_of_neighbor_set = [set()] * len(self.regions)  # each element is the reference to the same set object
-        list_of_neighbor_set = [set() for i in range(len(self.regions))]
+        list_of_neighbor_set = [set() for i in range(len(geo.x))]
         f = geo.faces
         for face in f:
             for vtx_id in face:
                 list_of_neighbor_set[vtx_id].update(set(face))
 
         # add neighbors
-        for r_id in range(len(self.regions)):
-            list_of_neighbor_set[r_id].remove(r_id)
-            for neighbor_id in list_of_neighbor_set[r_id]:
-                self.regions[r_id].add_neighbor(self.regions[neighbor_id])
+        if mask is None:
+            for r_id in range(len(self.regions)):
+                list_of_neighbor_set[r_id].remove(r_id)
+                for neighbor_id in list_of_neighbor_set[r_id]:
+                    self.regions[r_id].add_neighbor(self.regions[neighbor_id])
+        else:
+            for r_id in range(len(self.regions)):
+                v_id = self.regions[r_id].id
+                list_of_neighbor_set[v_id].remove(v_id)
+                for neighbor_v_id in list_of_neighbor_set[v_id]:
+                    neighbor_r_id = self.v_id2r_id.get(neighbor_v_id)
+                    if neighbor_r_id is not None:
+                        self.regions[r_id].add_neighbor(self.regions[neighbor_r_id])
 
     def get_regions(self):
-        return self.regions
+        return self.regions, self.v_id2r_id
 
     def get_seed_region(self):
         """
@@ -260,6 +287,9 @@ class SeededRegionGrowing(object):
 
         # call methods of the class
         self._compute()
+
+    def set_seed(self, x, y):
+        pass
 
     def _compute(self):
         """
