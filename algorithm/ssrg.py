@@ -303,6 +303,7 @@ class SeededRegionGrowing(object):
         # Not a Number (NaN), positive infinity and negative infinity evaluate to
         # True because these are not equal to zero.
         neighbor = [None] * n_seed
+        r_in_seed_list = list(self.seed_region)
 
         while np.any(np.less(region_size, self.stop_criteria)):
             r_to_grow = np.less(region_size, self.stop_criteria)
@@ -318,20 +319,24 @@ class SeededRegionGrowing(object):
 
             # find the seed which has min neighbor in this iteration
             r = np.argmin(dist)
+            target_neighbor = neighbor[r]
 
-            # merge the neighbor to the seed
-            self.seed_region[r].merge(neighbor[r])
+            # Prevent a seed from intersecting with another seed
+            if target_neighbor not in r_in_seed_list:
+                r_in_seed_list.append(target_neighbor)
+                # merge the neighbor to the seed
+                self.seed_region[r].merge(target_neighbor)
 
             # remove the neighbor from the neighbor list of all seeds
             for i in r_index:
-                self.seed_region[i].remove_neighbor(neighbor[r])
+                self.seed_region[i].remove_neighbor(target_neighbor)
 
             # update region_size
             if not self.seed_region[r].neighbor:
                 # If the seed has no neighbor, stop its growing.
                 region_size[r] = np.inf
             else:
-                region_size[r] = region_size[r] + neighbor[r].size()
+                region_size[r] = region_size[r] + target_neighbor.size()
 
     def region2text(self):
         """
