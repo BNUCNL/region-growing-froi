@@ -1,5 +1,6 @@
 from ..core.dataobject import Hemisphere
 import numpy as np
+import copy
 
 
 class Region(object):
@@ -147,7 +148,7 @@ class Region(object):
 
 class SurfaceToRegions(object):
 
-    def __init__(self, hemisphere, mask=None):
+    def __init__(self, hemisphere, mask=None, n_ring=1):
         """
         represent the surface to preliminary regions
 
@@ -157,6 +158,9 @@ class SurfaceToRegions(object):
             a instance of the class Hemisphere
         mask: scalar_data
             specify a area where the ROI is in.
+        n_ring: int
+            The n-ring neighbors of v are defined as vertices that are
+            reachable from v by traversing no more than n edges in the mesh.
 
         Returns
         -------
@@ -168,6 +172,7 @@ class SurfaceToRegions(object):
 
         geo = hemisphere.geo
         scalars = hemisphere.scalar_dict
+        n_vtx = len(geo.x)
 
         # just temporarily use the field to find suitable seed_region
         # self.scalar = scalars.values()[0]
@@ -175,7 +180,7 @@ class SurfaceToRegions(object):
         if mask is not None:
             id_iter = np.nonzero(mask)[0]
         else:
-            id_iter = range(len(geo.x))
+            id_iter = range(n_vtx)
 
         self.regions = []
         self.v_id2r_id = dict()
@@ -199,24 +204,48 @@ class SurfaceToRegions(object):
                 self.regions.append(Region(v_id, vtx_feat))
                 self.v_id2r_id[v_id] = r_id
 
-        # find neighbors' id for each region
-        # list_of_neighbor_set = [set()] * len(self.regions)  # each element is the reference to the same set object
-        list_of_neighbor_set = [set() for i in range(len(geo.x))]
+        # find 1_ring neighbors' id for each region
+        # list_of_neighbor_set = [set()] * len(self.regions)  # each element is
+        # the reference to the same set object
+
+        list_of_neighbor_set = [set() for i in range(n_vtx)]
         f = geo.faces
         for face in f:
-            for vtx_id in face:
-                list_of_neighbor_set[vtx_id].update(set(face))
+            for v_id in face:
+                list_of_neighbor_set[v_id].update(set(face))
+
+        for v_id in range(n_vtx):
+            list_of_neighbor_set[v_id].remove(v_id)
+
+        # n_ring neighbors
+        list_of_1_ring_neighbor_set = copy.deepcopy(list_of_neighbor_set)
+        list_of_n_ring_neighbor_set = copy.deepcopy(list_of_neighbor_set)
+        n = 1
+        while n < n_ring:
+
+            for neighbor_set in list_of_n_ring_neighbor_set:
+                neighbor_set_tmp = neighbor_set.copy()
+                for v_id in neighbor_set_tmp:
+                    neighbor_set.update(list_of_1_ring_neighbor_set[v_id])
+
+            if n == 1:
+                for v_id in range(n_vtx):
+                    list_of_n_ring_neighbor_set[v_id].remove(v_id)
+
+            for v_id in range(n_vtx):
+                list_of_n_ring_neighbor_set[v_id] -= list_of_neighbor_set[v_id]
+                list_of_neighbor_set[v_id] |= list_of_n_ring_neighbor_set[v_id]
+
+            n += 1
 
         # add neighbors
         if mask is None:
             for r_id in range(len(self.regions)):
-                list_of_neighbor_set[r_id].remove(r_id)
                 for neighbor_id in list_of_neighbor_set[r_id]:
                     self.regions[r_id].add_neighbor(self.regions[neighbor_id])
         else:
             for r_id in range(len(self.regions)):
                 v_id = self.regions[r_id].id
-                list_of_neighbor_set[v_id].remove(v_id)
                 for neighbor_v_id in list_of_neighbor_set[v_id]:
                     neighbor_r_id = self.v_id2r_id.get(neighbor_v_id)
                     if neighbor_r_id is not None:
@@ -327,16 +356,17 @@ class SeededRegionGrowing(object):
                 # merge the neighbor to the seed
                 self.seed_region[r].merge(target_neighbor)
 
-            # remove the neighbor from the neighbor list of all seeds
             for i in r_index:
+
+                # remove the neighbor from the neighbor list of growing seeds
                 self.seed_region[i].remove_neighbor(target_neighbor)
 
-            # update region_size
-            if not self.seed_region[r].neighbor:
-                # If the seed has no neighbor, stop its growing.
-                region_size[r] = np.inf
-            else:
-                region_size[r] = region_size[r] + target_neighbor.size()
+                # update region_size
+                if not self.seed_region[i].neighbor:
+                    # If the seed has no neighbor, stop its growing.
+                    region_size[i] = np.inf
+
+            region_size[r] = region_size[r] + target_neighbor.size()
 
     def region2text(self):
         """
